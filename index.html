@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#7c5cff">
+  <meta name="theme-color" content="#eef7ff">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -19,6 +19,37 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
   <style>
+    /* Сплэш — сразу, до основного CSS */
+    .app-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background: #eef7ff;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+    }
+    .app-splash.hide {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .app-splash img {
+      width: 96px;
+      height: 96px;
+      border-radius: 24px;
+      box-shadow: 0 10px 28px rgba(120, 140, 180, 0.22);
+    }
+    .app-splash-ver {
+      font-family: "Trebuchet MS", "Segoe UI", Candara, sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: #1c1f2a;
+      letter-spacing: 0.01em;
+    }
     :root {
       --bg: transparent;
       --surface: rgba(255, 255, 255, 0.55);
@@ -171,6 +202,13 @@
     .ico-lg { width: 28px; height: 28px; }
 
     /* ─── Верхняя панель ─── */
+    .app-header {
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+
     .topbar {
       height: var(--header-h);
       background: transparent;
@@ -180,7 +218,6 @@
       padding: 0 12px;
       gap: 8px;
       flex-shrink: 0;
-      z-index: 100;
     }
 
     .view-tabs {
@@ -432,15 +469,15 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: 6px;
       flex-shrink: 0;
       padding: 0 12px 8px;
     }
 
     .date-nav button {
-      width: 38px;
-      height: 38px;
-      border-radius: 14px;
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
       color: var(--icon);
       display: flex;
       align-items: center;
@@ -448,24 +485,31 @@
       background: var(--glass-strong);
       box-shadow: var(--shadow-out-sm);
       border: 1px solid rgba(255,255,255,0.55);
+      flex-shrink: 0;
     }
 
     .date-nav button:active { box-shadow: var(--shadow-in-sm); }
 
     .date-nav .current-label {
       font-weight: 800;
-      font-size: 16px;
-      min-width: 150px;
+      font-size: 15px;
+      min-width: 0;
+      max-width: 52vw;
       text-align: center;
       color: var(--text);
       letter-spacing: -0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 0 1 auto;
+      padding: 0 4px;
     }
 
     .date-nav .today-cal-btn {
-      width: 38px;
-      height: 38px;
+      width: 36px;
+      height: 36px;
       padding: 0;
-      border-radius: 14px;
+      border-radius: 12px;
       background: var(--glass-strong);
       box-shadow: var(--shadow-out-sm);
       border: 1px solid rgba(255,255,255,0.55);
@@ -1816,6 +1860,52 @@
       margin: -4px 0 12px;
     }
 
+    .settings-section.collapsible {
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+    .settings-section.collapsible > .settings-collapse-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 10px;
+      background: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+      box-shadow: none;
+      text-align: left;
+      color: inherit;
+      font: inherit;
+    }
+    .settings-section.collapsible > .settings-collapse-btn h3 {
+      margin: 0;
+      flex: 1;
+    }
+    .settings-section.collapsible .collapse-chevron {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      stroke: var(--text-muted);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform 0.2s ease;
+    }
+    .settings-section.collapsible:not(.open) .collapse-chevron {
+      transform: rotate(-90deg);
+    }
+    .settings-section.collapsible:not(.open) > .settings-collapse-body {
+      display: none;
+    }
+    .settings-section.collapsible.open > .settings-collapse-body {
+      display: block;
+      margin-top: 12px;
+    }
+
     .event-type-item {
       display: flex;
       align-items: center;
@@ -2072,7 +2162,53 @@
 
     /* ─── Адаптив ─── */
     @media (min-width: 768px) {
-      .topbar { padding: 0 16px; }
+      .app-header {
+        position: relative;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        min-height: 52px;
+        padding: 8px 16px;
+        gap: 12px;
+      }
+      .topbar {
+        height: auto;
+        padding: 0;
+        flex: 0 0 auto;
+        position: relative;
+        z-index: 2;
+      }
+      .view-tabs {
+        flex: 0 0 auto;
+        width: auto;
+        max-width: none;
+        gap: 0;
+        padding: 3px;
+      }
+      .view-tabs button {
+        flex: 0 0 auto;
+        padding: 7px 12px;
+        font-size: 12px;
+      }
+      /* Дата всегда по центру экрана */
+      .date-nav {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1;
+        gap: 8px;
+        padding: 0;
+        height: auto;
+        width: max-content;
+        max-width: calc(100% - 280px);
+        justify-content: center;
+      }
+      .date-nav .current-label {
+        max-width: none;
+        font-size: 16px;
+        text-align: center;
+      }
       .modal-body { max-width: 560px; margin: 0 auto; width: 100%; }
       .modal-footer { max-width: 560px; margin: 0 auto; width: 100%; }
       .month-slot { width: 10px; height: 10px; }
@@ -2088,7 +2224,13 @@
 </head>
 <body>
 
-  <!-- Верхняя панель -->
+  <div class="app-splash" id="appSplash" aria-hidden="false">
+    <img src="icon-192.png" alt="CalenBot" width="96" height="96">
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.1</div>
+  </div>
+
+  <!-- Верхняя панель + навигация по датам -->
+  <div class="app-header" id="appHeader">
   <header class="topbar">
     <div class="view-tabs" id="viewTabs">
       <button data-view="home" class="active" title="Главная">
@@ -2121,6 +2263,7 @@
       <span class="cal-week-num" id="btnTodayWeekNum" aria-hidden="true"></span>
     </button>
   </nav>
+  </div>
 
   <!-- Основная область -->
   <main class="main" id="mainArea">
@@ -2393,13 +2536,18 @@
         <button class="btn btn-primary" id="btnForceSync" style="width:100%;margin-top:8px">Принудительная синхронизация</button>
       </div>
 
-      <div class="settings-section">
-        <h3>Данные</h3>
-        <p class="settings-hint">Резервная копия событий и настроек в файл JSON</p>
-        <button class="btn btn-ghost" id="btnExportData" style="width:100%">Экспорт в файл</button>
-        <button class="btn btn-ghost" id="btnImportData" style="width:100%;margin-top:8px">Импорт из файла</button>
-        <button class="btn btn-ghost" id="btnClearDemo" style="width:100%;margin-top:8px">Очистить демо-данные</button>
-        <input type="file" id="importFileInput" accept="application/json,.json" hidden>
+      <div class="settings-section collapsible" id="settingsDataSection">
+        <button type="button" class="settings-collapse-btn" id="btnToggleDataSection" aria-expanded="false">
+          <h3>Данные</h3>
+          <svg class="collapse-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="settings-collapse-body">
+          <p class="settings-hint">Резервная копия событий и настроек в файл JSON</p>
+          <button class="btn btn-ghost" id="btnExportData" style="width:100%">Экспорт в файл</button>
+          <button class="btn btn-ghost" id="btnImportData" style="width:100%;margin-top:8px">Импорт из файла</button>
+          <button class="btn btn-ghost" id="btnClearDemo" style="width:100%;margin-top:8px">Очистить демо-данные</button>
+          <input type="file" id="importFileInput" accept="application/json,.json" hidden>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -2469,6 +2617,28 @@
 
 // URL Google Apps Script — замените на свой после деплоя
 const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
+
+/**
+ * Версия: 1.1.{N}, где N — номер итерации за день сборки.
+ * При правке в тот же день: увеличьте APP_BUILD_ITER.
+ * В новый день: поставьте APP_BUILD_DATE = сегодня, APP_BUILD_ITER = 1.
+ */
+const APP_VER_MAJOR = 1;
+const APP_VER_MINOR = 1;
+const APP_BUILD_DATE = '2026-07-29';
+const APP_BUILD_ITER = 1;
+
+function getAppVersionString() {
+  return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
+}
+
+function hideAppSplash() {
+  const el = document.getElementById('appSplash');
+  if (!el || el.classList.contains('hide')) return;
+  el.classList.add('hide');
+  el.setAttribute('aria-hidden', 'true');
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 450);
+}
 
 const DEFAULT_SETTINGS = {
   dayStart: '05:30',
@@ -5008,6 +5178,10 @@ function openSettings() {
   document.getElementById('sScriptUrl').value =
     (s.scriptUrl && s.scriptUrl !== 'СЮДА_ВСТАВИТЬ_URL') ? s.scriptUrl : '';
   renderEventTypes();
+  const dataSec = document.getElementById('settingsDataSection');
+  const dataBtn = document.getElementById('btnToggleDataSection');
+  if (dataSec) dataSec.classList.remove('open');
+  if (dataBtn) dataBtn.setAttribute('aria-expanded', 'false');
   document.getElementById('modalSettings').classList.add('open');
 }
 
@@ -5538,6 +5712,12 @@ document.getElementById('btnAddType').onclick = () => openTypeDialog(-1);
 document.getElementById('btnForceSync').onclick = () => {
   sync(true);
 };
+document.getElementById('btnToggleDataSection').onclick = () => {
+  const sec = document.getElementById('settingsDataSection');
+  const btn = document.getElementById('btnToggleDataSection');
+  const open = sec.classList.toggle('open');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+};
 document.getElementById('btnExportData').onclick = exportAppData;
 document.getElementById('btnImportData').onclick = () => {
   document.getElementById('importFileInput').click();
@@ -5574,6 +5754,10 @@ setInterval(() => {
 
 /* ─── Запуск ─── */
 function init() {
+  const splashVer = document.getElementById('appSplashVer');
+  if (splashVer) splashVer.textContent = getAppVersionString();
+  const splashShownAt = Date.now();
+
   loadStore();
   repairBrokenEventDates();
   state.cursor = new Date();
@@ -5598,10 +5782,14 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=16').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=21').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
+
+  const minSplashMs = 700;
+  const left = Math.max(0, minSplashMs - (Date.now() - splashShownAt));
+  setTimeout(hideAppSplash, left);
 }
 
 init();
