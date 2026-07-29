@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!-- CalenBot v1.1.9 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
+<!-- CalenBot v1.1.12 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -152,14 +152,16 @@
 
     html {
       height: 100%;
+      height: 100dvh;
       height: -webkit-fill-available;
       background-color: var(--body-bg-base, #eef7ff);
     }
 
     html, body {
-      min-height: 100%;
-      min-height: 100dvh;
-      min-height: -webkit-fill-available;
+      height: 100%;
+      height: 100dvh;
+      height: -webkit-fill-available;
+      margin: 0;
       font-family: var(--font);
       color: var(--text);
       -webkit-tap-highlight-color: transparent;
@@ -596,16 +598,24 @@
 
     /* ─── Основная область ─── */
     .main {
-      flex: 1;
+      flex: 1 1 auto;
+      min-height: 0;
+      height: 0; /* принуждает flex-ребёнка сжиматься → скролл внутри view */
       overflow: hidden;
       position: relative;
       display: flex;
       flex-direction: column;
       padding: 0 4px calc(var(--footer-h) + env(safe-area-inset-bottom, 0px) + 4px);
+      box-sizing: border-box;
     }
 
-    .view { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+    .view { display: none; flex: 1 1 auto; min-height: 0; overflow: hidden; flex-direction: column; }
     .view.active { display: flex; }
+    #viewWeek,
+    #viewDay {
+      min-height: 0;
+      height: 100%;
+    }
 
     /* ─── Главная ─── */
     .home-view {
@@ -1164,6 +1174,7 @@
       display: flex;
       flex-direction: column;
       flex: 1;
+      min-height: 0;
       overflow: hidden;
       background: var(--surface);
     }
@@ -1335,10 +1346,12 @@
 
     .week-scroll {
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
       position: relative;
+      touch-action: pan-y;
     }
 
     .week-zone {
@@ -1417,12 +1430,15 @@
     }
 
     .main {
-      flex: 1;
+      flex: 1 1 auto;
+      min-height: 0;
+      height: 0;
       overflow: hidden;
       position: relative;
       display: flex;
       flex-direction: column;
       padding: 0 4px calc(var(--footer-h) + env(safe-area-inset-bottom, 0px) + 4px);
+      box-sizing: border-box;
     }
 
     .rr-day.active {
@@ -1505,6 +1521,7 @@
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
+      touch-action: pan-y;
     }
     .day-view-inner.past-day {
       filter: brightness(0.92);
@@ -2256,7 +2273,7 @@
 
   <div class="app-splash" id="appSplash" aria-hidden="false">
     <img src="icon-512.png" alt="CalenBot" width="384" height="384">
-    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.9</div>
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.12</div>
   </div>
 
   <!-- Верхняя панель + навигация по датам -->
@@ -2567,7 +2584,7 @@
           <input type="checkbox" id="sImportGcal">
           <span>Импорт Google Календаря (−30…+90 дн.)</span>
         </label>
-        <p class="settings-hint">Односторонне: встречи основного календаря корп. аккаунта, от которого развёрнут Apps Script. После смены Code.gs — новая версия веб-приложения.</p>
+        <p class="settings-hint">Если ошибка «does not have permission…calendar» — в Apps Script добавьте scope <code>calendar.readonly</code> (файл appsscript.json), запустите <code>authorizeCalendarOnce</code>, затем задеплойте <strong>новую версию</strong> веб-приложения.</p>
         <button class="btn btn-primary" id="btnForceSync" style="width:100%;margin-top:8px">Принудительная синхронизация</button>
       </div>
 
@@ -2662,7 +2679,7 @@ const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
 const APP_VER_MAJOR = 1;
 const APP_VER_MINOR = 1;
 const APP_BUILD_DATE = '2026-07-29';
-const APP_BUILD_ITER = 9;
+const APP_BUILD_ITER = 12;
 
 function getAppVersionString() {
   return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
@@ -3179,17 +3196,45 @@ async function fetchRemote() {
   }
   // Новый формат { events, calendarIncluded } или старый массив
   if (Array.isArray(data)) {
-    return { events: data, calendarIncluded: false, calendarError: null, calendarCount: 0 };
+    return {
+      events: data,
+      calendarIncluded: false,
+      calendarError: null,
+      calendarCount: 0,
+      legacyArray: true,
+      api: null
+    };
   }
   if (data && Array.isArray(data.events)) {
     return {
       events: data.events,
       calendarIncluded: !!data.calendarIncluded,
       calendarError: data.calendarError || null,
-      calendarCount: data.calendarCount || 0
+      calendarCount: data.calendarCount || 0,
+      legacyArray: false,
+      api: data.api || null
     };
   }
   throw new Error('Некорректный ответ сервера');
+}
+
+function captureViewScroll() {
+  const out = {};
+  const ws = document.getElementById('weekScroll');
+  const ds = document.getElementById('dayViewInner');
+  if (ws) out.week = ws.scrollTop;
+  if (ds) out.day = ds.scrollTop;
+  return out;
+}
+
+function restoreViewScroll(pos) {
+  if (!pos) return;
+  requestAnimationFrame(() => {
+    const ws = document.getElementById('weekScroll');
+    const ds = document.getElementById('dayViewInner');
+    if (ws && pos.week != null) ws.scrollTop = pos.week;
+    if (ds && pos.day != null) ds.scrollTop = pos.day;
+  });
 }
 
 async function pushQueue() {
@@ -3538,18 +3583,27 @@ async function sync(force) {
       if (jump) state.cursor = parseDate(jump);
       else state.cursor = new Date();
     }
+    const scrollPos = captureViewScroll();
     render();
+    restoreViewScroll(scrollPos);
     updateOfflineStub();
     if (force) {
-      if (remote && remote.calendarError) {
+      if (state.settings.importGoogleCalendar && remote && remote.legacyArray) {
+        showToast('Календарь: обновите Code.gs и задеплойте новую версию веб-приложения', true);
+      } else if (remote && remote.calendarError) {
         showToast('Календарь: ' + remote.calendarError, true);
+      } else if (state.settings.importGoogleCalendar && remote && !remote.calendarIncluded) {
+        showToast('Календарь не подтянулся — проверьте доступ Apps Script к Calendar', true);
       } else {
+        const gcalN = activeEvents().filter(e => isGcalUid(e.uid)).length;
         const lines = activeEvents().slice(0, 5).map(e =>
           (e.exerciseName || '?') + ' @ ' + (normalizeEventDate(e.event_date) || 'нет даты')
         );
         let msg = 'Синк · ' + activeEvents().length + ' соб.';
         if (remote && remote.calendarIncluded) {
           msg += ' · календ. ' + (remote.calendarCount || 0);
+        } else if (gcalN) {
+          msg += ' · gcal ' + gcalN;
         }
         showToast(
           msg + (lines.length ? ' · ' + lines.join('; ') : ''),
@@ -5913,15 +5967,12 @@ window.addEventListener('offline', () => {
   updateOfflineStub();
 });
 
-/* Синк при возврате в приложение (PWA / вкладка) */
+/* Синк при возврате в приложение (PWA / вкладка) — без window.focus (ломает скролл) */
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') syncOnAppOpen('visible');
 });
 window.addEventListener('pageshow', (e) => {
   if (e.persisted) syncOnAppOpen('pageshow');
-});
-window.addEventListener('focus', () => {
-  syncOnAppOpen('focus');
 });
 
 /* ─── Периодическая синхронизация ─── */
@@ -5962,7 +6013,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=29').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=32').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
