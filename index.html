@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!-- CalenBot v1.1.2 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
+<!-- CalenBot v1.1.4 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#eef7ff">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CalenBot">
   <meta name="application-name" content="CalenBot">
   <title>CalenBot</title>
@@ -23,12 +23,17 @@
     .app-splash {
       position: fixed;
       inset: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      min-height: 100%;
+      min-height: -webkit-fill-available;
       z-index: 10000;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 16px;
+      gap: 24px;
       background: #eef7ff;
       transition: opacity 0.4s ease, visibility 0.4s ease;
     }
@@ -38,14 +43,16 @@
       pointer-events: none;
     }
     .app-splash img {
-      width: 192px;
-      height: 192px;
-      border-radius: 44px;
-      box-shadow: 0 12px 32px rgba(120, 140, 180, 0.25);
+      width: 384px;
+      height: 384px;
+      max-width: min(384px, 78vw);
+      max-height: min(384px, 78vw);
+      border-radius: 88px;
+      box-shadow: 0 20px 48px rgba(120, 140, 180, 0.28);
     }
     .app-splash-ver {
       font-family: "Trebuchet MS", "Segoe UI", Candara, sans-serif;
-      font-size: 17px;
+      font-size: 34px;
       font-weight: 700;
       color: #1c1f2a;
       letter-spacing: 0.01em;
@@ -87,6 +94,7 @@
       --glass-strong: rgba(255, 255, 255, 0.82);
       --font: "Trebuchet MS", "Segoe UI", Candara, sans-serif;
       --icon: #5c6478;
+      --body-bg-base: #eef7ff;
       --body-bg:
         radial-gradient(ellipse 90% 70% at 0% 0%, #d8f56a 0%, transparent 55%),
         radial-gradient(ellipse 80% 60% at 100% 10%, #9ed7ff 0%, transparent 50%),
@@ -94,7 +102,7 @@
         linear-gradient(160deg, #f4ffe0 0%, #eef7ff 45%, #f7f4ff 100%);
       --pill-bg: #1c1f2a;
       --pill-fg: #fff;
-      --theme-color: #d4f06a;
+      --theme-color: #eef7ff;
     }
 
     html[data-theme="dark"] {
@@ -120,6 +128,7 @@
       --glass: rgba(36, 40, 56, 0.72);
       --glass-strong: rgba(44, 48, 66, 0.9);
       --icon: #b0b8cc;
+      --body-bg-base: #1c2030;
       --body-bg:
         radial-gradient(ellipse 90% 70% at 0% 0%, rgba(180, 210, 60, 0.22) 0%, transparent 55%),
         radial-gradient(ellipse 80% 60% at 100% 10%, rgba(80, 140, 200, 0.28) 0%, transparent 50%),
@@ -127,7 +136,7 @@
         linear-gradient(160deg, #161822 0%, #1c2030 45%, #222038 100%);
       --pill-bg: #e9ebf2;
       --pill-fg: #1c1f2a;
-      --theme-color: #2a2f42;
+      --theme-color: #1c2030;
       --danger: #ff8a9a;
       --success: #3dd68c;
     }
@@ -141,24 +150,45 @@
       color: #2a2438;
     }
 
-    html, body {
+    html {
       height: 100%;
+      height: -webkit-fill-available;
+      background-color: var(--body-bg-base, #eef7ff);
+    }
+
+    html, body {
       min-height: 100%;
       min-height: 100dvh;
+      min-height: -webkit-fill-available;
       font-family: var(--font);
       color: var(--text);
       -webkit-tap-highlight-color: transparent;
       overscroll-behavior: none;
-      background: var(--body-bg);
-      background-attachment: fixed;
+      background-color: var(--body-bg-base, #eef7ff);
     }
 
     body {
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      padding-bottom: env(safe-area-inset-bottom, 0px);
       box-sizing: border-box;
+      position: relative;
+    }
+
+    /* Фон на весь экран (в т.ч. safe-area) — fixed attachment на мобилках даёт чёрную полосу */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      min-height: 100%;
+      min-height: -webkit-fill-available;
+      z-index: -1;
+      pointer-events: none;
+      background-color: var(--body-bg-base, #eef7ff);
+      background-image: var(--body-bg);
     }
 
     button {
@@ -270,11 +300,11 @@
       box-sizing: border-box;
       pointer-events: none;
       background:
-        linear-gradient(to top, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.35) 55%, transparent 100%);
+        linear-gradient(to top, var(--body-bg-base) 0%, rgba(255,255,255,0.55) 45%, transparent 100%);
     }
     html[data-theme="dark"] .app-footer {
       background:
-        linear-gradient(to top, rgba(28, 32, 46, 0.92) 0%, rgba(28, 32, 46, 0.45) 55%, transparent 100%);
+        linear-gradient(to top, var(--body-bg-base) 0%, rgba(28, 32, 46, 0.75) 45%, transparent 100%);
     }
 
     .app-footer.search-open {
@@ -2225,8 +2255,8 @@
 <body>
 
   <div class="app-splash" id="appSplash" aria-hidden="false">
-    <img src="icon-192.png" alt="CalenBot" width="192" height="192">
-    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.2</div>
+    <img src="icon-512.png" alt="CalenBot" width="384" height="384">
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.4</div>
   </div>
 
   <!-- Верхняя панель + навигация по датам -->
@@ -2627,7 +2657,7 @@ const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
 const APP_VER_MAJOR = 1;
 const APP_VER_MINOR = 1;
 const APP_BUILD_DATE = '2026-07-29';
-const APP_BUILD_ITER = 2;
+const APP_BUILD_ITER = 4;
 
 function getAppVersionString() {
   return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
@@ -5596,7 +5626,9 @@ function applyTheme() {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
     const styles = getComputedStyle(document.documentElement);
-    meta.setAttribute('content', (styles.getPropertyValue('--theme-color') || '').trim() || '#d4f06a');
+    const base = (styles.getPropertyValue('--body-bg-base') || '').trim();
+    const theme = (styles.getPropertyValue('--theme-color') || '').trim();
+    meta.setAttribute('content', base || theme || '#eef7ff');
   }
 }
 
@@ -5783,7 +5815,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=22').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=24').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
