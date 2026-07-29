@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!-- CalenBot v1.1.4 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
+<!-- CalenBot v1.1.5 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -2256,7 +2256,7 @@
 
   <div class="app-splash" id="appSplash" aria-hidden="false">
     <img src="icon-512.png" alt="CalenBot" width="384" height="384">
-    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.4</div>
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.5</div>
   </div>
 
   <!-- Верхняя панель + навигация по датам -->
@@ -2657,7 +2657,7 @@ const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
 const APP_VER_MAJOR = 1;
 const APP_VER_MINOR = 1;
 const APP_BUILD_DATE = '2026-07-29';
-const APP_BUILD_ITER = 4;
+const APP_BUILD_ITER = 5;
 
 function getAppVersionString() {
   return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
@@ -2886,6 +2886,23 @@ function isNightEvent(ev) {
 function isAllDay(ev) {
   return ev.is_all_day === true || ev.is_all_day === 'TRUE' ||
     (!ev.start_time && !ev.end_time);
+}
+
+/** Событие ещё актуально относительно текущего времени (не закончилось) */
+function isEventRemainingNow(ev, now) {
+  if (!ev || isDone(ev)) return false;
+  if (isAllDay(ev)) return true;
+  const ref = now || new Date();
+  const nowMins = ref.getHours() * 60 + ref.getMinutes();
+  const start = timeToMinutes(ev.start_time);
+  let end = timeToMinutes(ev.end_time);
+  if (end == null) end = start != null ? start + 60 : null;
+  if (end == null) return true;
+  // Ночное/через полночь: end <= start
+  if (start != null && end <= start) {
+    return nowMins >= start || nowMins < end;
+  }
+  return end > nowMins;
 }
 
 function isDone(ev) {
@@ -4023,6 +4040,24 @@ function renderDateNav() {
 }
 
 /* ─── Рендер: Главная ─── */
+let _homeRemainTimer = null;
+
+function scheduleHomeRemainRefresh() {
+  if (_homeRemainTimer) clearInterval(_homeRemainTimer);
+  _homeRemainTimer = null;
+  if (state.view !== 'home') return;
+  _homeRemainTimer = setInterval(() => {
+    if (state.view !== 'home') {
+      clearInterval(_homeRemainTimer);
+      _homeRemainTimer = null;
+      return;
+    }
+    const day = new Date(state.cursor);
+    const today = new Date();
+    if (sameDay(day, today)) renderHome();
+  }, 60000);
+}
+
 function renderHome() {
   const wrap = document.getElementById('homeView');
   const today = new Date();
@@ -4031,7 +4066,12 @@ function renderHome() {
   day.setHours(0, 0, 0, 0);
   const ds = toDateStr(day);
   const isToday = sameDay(day, today);
-  const dayEvs = eventsForDate(ds);
+  const now = new Date();
+  let dayEvs = eventsForDate(ds);
+  // На сегодня — только ещё не закончившиеся (и не done)
+  if (isToday) {
+    dayEvs = dayEvs.filter(ev => isEventRemainingNow(ev, now));
+  }
 
   const types = (state.settings.eventTypes || []).slice();
   const counts = {};
@@ -4047,6 +4087,11 @@ function renderHome() {
     }
   });
 
+  // Сегодня: показываем только типы, у которых ещё есть события
+  const visibleTypes = isToday
+    ? types.filter(t => (counts[t.name] || 0) > 0)
+    : types;
+
   const yday = addDays(today, -1);
   const tmrw = addDays(today, 1);
   let dayLabel = 'День';
@@ -4054,9 +4099,14 @@ function renderHome() {
   else if (sameDay(day, yday)) dayLabel = 'Вчера';
   else if (sameDay(day, tmrw)) dayLabel = 'Завтра';
 
-  const sectionTitle = isToday
-    ? 'У вас на сегодня запланировано следующее'
-    : 'У вас на этот день запланировано следующее';
+  let sectionTitle;
+  if (isToday) {
+    sectionTitle = visibleTypes.length
+      ? 'Осталось на сейчас'
+      : 'На сейчас ничего не осталось';
+  } else {
+    sectionTitle = 'У вас на этот день запланировано следующее';
+  }
 
   let html = '<div class="home-today-label">' + dayLabel + '</div>';
   html += '<div class="home-date">' + day.getDate() + ' ' + MONTHS_RU_GEN[day.getMonth()] +
@@ -4065,10 +4115,12 @@ function renderHome() {
   html += '<div class="home-section-title">' + sectionTitle + '</div>';
   html += '<div class="home-types">';
 
-  if (!types.length) {
+  if (isToday && !visibleTypes.length) {
+    html += '<div class="home-empty">Все события на сегодня уже прошли</div>';
+  } else if (!types.length) {
     html += '<div class="home-empty">Типы событий не настроены</div>';
   } else {
-    types.forEach(t => {
+    (visibleTypes.length ? visibleTypes : types).forEach(t => {
       const n = counts[t.name] || 0;
       html += '<div class="home-type-card" data-type="' + esc(t.name) + '">';
       html += '<span class="home-type-dot" style="background:' + (t.color || '#e8e0ff') + '"></span>';
@@ -4085,6 +4137,8 @@ function renderHome() {
       switchView('day');
     });
   });
+
+  scheduleHomeRemainRefresh();
 }
 
 function animateHomeSwipe(dayStep) {
@@ -4844,6 +4898,10 @@ function switchView(view) {
     document.getElementById('appFooter').classList.remove('search-open');
     document.getElementById('searchInput').value = '';
     state.searchQuery = '';
+  }
+  if (view !== 'home' && _homeRemainTimer) {
+    clearInterval(_homeRemainTimer);
+    _homeRemainTimer = null;
   }
   state.view = view;
   document.querySelectorAll('.view-tabs button').forEach(b => {
@@ -5815,7 +5873,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=24').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=25').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
