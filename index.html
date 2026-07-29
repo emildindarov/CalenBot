@@ -2778,7 +2778,29 @@ function activeEvents() {
 }
 
 function eventsForDate(dateStr) {
-  return activeEvents().filter(e => e.event_date === dateStr);
+  const want = normalizeEventDate(dateStr);
+  if (!want) return [];
+  return activeEvents().filter(e => normalizeEventDate(e.event_date) === want);
+}
+
+/** Ближайшая дата с событиями относительно курсора */
+function nearestEventDate(fromDateStr) {
+  const from = normalizeEventDate(fromDateStr) || toDateStr(new Date());
+  const dates = [...new Set(
+    activeEvents().map(e => normalizeEventDate(e.event_date)).filter(isValidYmd)
+  )].sort();
+  if (!dates.length) return null;
+  if (dates.indexOf(from) >= 0) return from;
+  let best = dates[0];
+  let bestDist = Math.abs(parseDate(best) - parseDate(from));
+  dates.forEach(ds => {
+    const dist = Math.abs(parseDate(ds) - parseDate(from));
+    if (dist < bestDist) {
+      best = ds;
+      bestDist = dist;
+    }
+  });
+  return best;
 }
 
 function timedEvents(list) {
@@ -2861,9 +2883,25 @@ async function pushQueue() {
 
 function normalizeEventDate(v) {
   if (v == null || v === '') return '';
+  // Серийный номер даты Google Sheets / Excel
+  if (typeof v === 'number' && isFinite(v) && v > 20000 && v < 120000) {
+    const epoch = Date.UTC(1899, 11, 30);
+    const d = new Date(epoch + Math.round(v) * 86400000);
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+  }
   if (typeof v === 'string') {
-    const s = v.replace(/^'/, '').trim();
-    // Полный ISO с временем — берём ЛОКАЛЬНЫЙ календарный день (иначе UTC сдвигает сутки)
+    let s = v.replace(/^'/, '').replace(/\u00a0/g, ' ').trim();
+    if (/^\d{5,6}([.,]\d+)?$/.test(s)) {
+      return normalizeEventDate(parseFloat(s.replace(',', '.')));
+    }
+    // Дата-only в UTC-полночь: не сдвигать через local Date
+    const dateOnly = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) return dateOnly[1] + '-' + dateOnly[2] + '-' + dateOnly[3];
+    // ISO на UTC-полночь = дата без времени (берём YYYY-MM-DD из строки)
+    if (/^\d{4}-\d{2}-\d{2}T00:00:00(\.\d+)?(Z|[+-]00:00)?$/i.test(s)) {
+      return s.slice(0, 10);
+    }
+    // Полный ISO — календарный день в локали устройства
     if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
       const d = new Date(s);
       if (!isNaN(d.getTime())) return toDateStr(d);
@@ -2872,12 +2910,14 @@ function normalizeEventDate(v) {
     if (m) return m[1];
     const dm = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
     if (dm) return dm[3] + '-' + pad(+dm[2]) + '-' + pad(+dm[1]);
+    const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (slash) return slash[3] + '-' + pad(+slash[2]) + '-' + pad(+slash[1]);
     const d = new Date(s);
     if (!isNaN(d.getTime())) return toDateStr(d);
     return s;
   }
   if (v instanceof Date && !isNaN(v.getTime())) return toDateStr(v);
-  return String(v);
+  return String(v).trim();
 }
 
 function normalizeTimeStr(v) {
@@ -2984,11 +3024,16 @@ async function mergeRemote(remoteRows, justPushedUids) {
       // Только что сохранили локально — не затираем
       const keep = Object.assign({}, loc);
       if (!isValidYmd(keep.event_date) && isValidYmd(rem.event_date)) keep.event_date = rem.event_date;
+      if (!keep.start_time && rem.start_time) keep.start_time = rem.start_time;
+      if (!keep.end_time && rem.end_time) keep.end_time = rem.end_time;
       merged.push(keep);
     } else if (rem.is_deleted && remMs >= locMs) {
       merged.push(Object.assign({}, loc, { is_deleted: true, last_modified: rem.last_modified || loc.last_modified }));
     } else if (locDel && remUsable) {
       // На другом устройстве событие есть — поднимаем с сервера
+      merged.push(rem);
+    } else if (!isValidYmd(loc.event_date) && remUsable && isValidYmd(rem.event_date)) {
+      // Локально без даты / битая дата — берём сервер
       merged.push(rem);
     } else if (!remUsable) {
       merged.push(loc);
@@ -3106,9 +3151,23 @@ async function sync(force) {
     }
     state.syncStatus = 'online';
     updateSyncUI();
+    // Если на текущем дне пусто, а события есть — перейти к ближайшей дате с ними
+    if (activeEvents().length && !eventsForDate(toDateStr(state.cursor)).length) {
+      const jump = nearestEventDate(toDateStr(state.cursor));
+      if (jump) state.cursor = parseDate(jump);
+    }
     render();
     updateOfflineStub();
-    if (force) showToast('Синхронизация завершена · ' + activeEvents().length + ' событий');
+    if (force) {
+      const lines = activeEvents().slice(0, 5).map(e =>
+        (e.exerciseName || '?') + ' @ ' + (normalizeEventDate(e.event_date) || 'нет даты')
+      );
+      showToast(
+        'Синк · ' + activeEvents().length + ' соб.' +
+        (lines.length ? ' · ' + lines.join('; ') : ''),
+        activeEvents().some(e => !isValidYmd(normalizeEventDate(e.event_date)))
+      );
+    }
   } catch (err) {
     console.error('Sync error:', err);
     state.syncStatus = navigator.onLine ? 'online' : 'offline';
@@ -4015,6 +4074,18 @@ function renderDay() {
       esc(holName) + '</div>';
   }
 
+  if (!dayEvs.length && activeEvents().length) {
+    const jump = nearestEventDate(ds);
+    html += '<div class="day-empty-hint" style="margin:12px 14px;padding:12px 14px;border-radius:16px;' +
+      'background:rgba(255,255,255,0.55);color:var(--text-muted);font-size:13px;line-height:1.4">';
+    html += 'На этот день событий нет, а в базе есть <b>' + activeEvents().length + '</b>.';
+    if (jump && jump !== ds) {
+      html += '<br><button type="button" id="btnJumpEventDate" class="btn btn-ghost" style="margin-top:8px;width:100%">' +
+        'Открыть ' + jump + '</button>';
+    }
+    html += '</div>';
+  }
+
   // Задачи дня
   if (tasks.length > 0) {
     html += '<div class="day-tasks-section"><h3>Задачи дня</h3>';
@@ -4070,6 +4141,16 @@ function renderDay() {
   html += '</div></div>';
 
   wrap.innerHTML = html;
+
+  const jumpBtn = document.getElementById('btnJumpEventDate');
+  if (jumpBtn) {
+    jumpBtn.addEventListener('click', () => {
+      const jump = nearestEventDate(ds);
+      if (!jump) return;
+      state.cursor = parseDate(jump);
+      render();
+    });
+  }
 
   wrap.querySelectorAll('.day-task-item, .tl-event').forEach(el => {
     el.addEventListener('click', e => {
@@ -5117,7 +5198,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=9').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=11').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
