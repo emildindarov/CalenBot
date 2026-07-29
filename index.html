@@ -3273,6 +3273,8 @@ function addEvent(data) {
     is_all_day: false,
     repeat_type: 'none',
     repeat_rule: null,
+    series_id: null,
+    series_role: null,
     last_modified: nowTs(),
     is_deleted: false
   }, data);
@@ -3336,20 +3338,210 @@ function defaultRepeatRule(fromDateStr) {
     weekdays: [monIdx],
     endType: 'date',
     endDate: toDateStr(end),
-    endCount: 1
+    endCount: 12
   };
 }
 
-/** Упаковка repeat_rule в instruction для синхронизации с таблицей */
+const REPEAT_MAX_OCCURRENCES = 366;
+
+/**
+ * Даты вхождений серии (включая дату начала).
+ * daily | weekly | monthly | yearly | custom
+ */
+function expandOccurrenceDates(startStr, repeatType, rule) {
+  const start = parseDate(normalizeEventDate(startStr));
+  if (!start || !repeatType || repeatType === 'none') {
+    return startStr ? [normalizeEventDate(startStr)] : [];
+  }
+
+  const dates = [];
+  const push = (d) => {
+    const ds = toDateStr(d);
+    if (dates.indexOf(ds) < 0) dates.push(ds);
+  };
+  push(start);
+
+  let endDate = null;
+  let maxCount = REPEAT_MAX_OCCURRENCES;
+  const r = rule || {};
+
+  if (repeatType === 'custom') {
+    if (r.endType === 'date' && r.endDate) {
+      endDate = parseDate(normalizeEventDate(r.endDate));
+    } else if (r.endType === 'count') {
+      maxCount = Math.min(REPEAT_MAX_OCCURRENCES, Math.max(1, +r.endCount || 1));
+    } else {
+      endDate = addDays(start, 365 * 2);
+    }
+  } else {
+    if (repeatType === 'daily') endDate = addDays(start, 90);
+    else if (repeatType === 'weekly') endDate = addDays(start, 7 * 16);
+    else if (repeatType === 'monthly') endDate = addDays(start, 365);
+    else if (repeatType === 'yearly') endDate = addDays(start, 365 * 5);
+    else endDate = addDays(start, 90);
+  }
+
+  const interval = Math.max(1, +(r.interval || 1));
+  const unit = repeatType === 'custom' ? (r.unit || 'week') : repeatType;
+
+  if (unit === 'day' || unit === 'daily') {
+    let d = addDays(start, interval);
+    while (dates.length < maxCount && (!endDate || d <= endDate)) {
+      push(d);
+      d = addDays(d, interval);
+    }
+  } else if (unit === 'week' || unit === 'weekly') {
+    const weekdays = (repeatType === 'custom' && r.weekdays && r.weekdays.length)
+      ? r.weekdays.slice().sort((a, b) => a - b)
+      : [((start.getDay() + 6) % 7)];
+    const startMon = weekMonday(start);
+    let d = new Date(start);
+    // Идём по дням; ограничим цикл
+    const hardEnd = endDate || addDays(start, interval * 7 * maxCount + 14);
+    d = addDays(d, 1);
+    while (dates.length < maxCount && d <= hardEnd) {
+      if (endDate && d > endDate) break;
+      const wd = (d.getDay() + 6) % 7;
+      if (weekdays.indexOf(wd) >= 0) {
+        const mon = weekMonday(d);
+        const weeksDiff = Math.round((mon - startMon) / 86400000 / 7);
+        if (weeksDiff >= 0 && weeksDiff % interval === 0) push(d);
+      }
+      d = addDays(d, 1);
+    }
+  } else if (unit === 'month' || unit === 'monthly') {
+    let i = 1;
+    while (dates.length < maxCount) {
+      const d = new Date(start.getFullYear(), start.getMonth() + interval * i, start.getDate());
+      if (endDate && d > endDate) break;
+      // коррекция переполнения дня месяца
+      if (d.getDate() !== start.getDate()) {
+        d.setDate(0); // последний день предыдущего месяца
+      }
+      push(d);
+      i++;
+    }
+  } else if (unit === 'year' || unit === 'yearly') {
+    let i = 1;
+    while (dates.length < maxCount) {
+      const d = new Date(start.getFullYear() + interval * i, start.getMonth(), start.getDate());
+      if (endDate && d > endDate) break;
+      push(d);
+      i++;
+    }
+  }
+
+  return dates.sort();
+}
+
+function getSeriesId(ev) {
+  if (!ev) return null;
+  if (ev.series_id) return String(ev.series_id);
+  if (ev.repeat_rule && ev.repeat_rule.series_id) return String(ev.repeat_rule.series_id);
+  return null;
+}
+
+function eventsInSeries(seriesId) {
+  if (!seriesId) return [];
+  return activeEvents().filter(e => getSeriesId(e) === seriesId);
+}
+
+function formatRepeatSummaryForSheet(repeatType, rule) {
+  if (!repeatType || repeatType === 'none') return '';
+  if (repeatType === 'custom') return formatRepeatRule(rule);
+  const map = { daily: 'Каждый день', weekly: 'Каждую неделю', monthly: 'Каждый месяц', yearly: 'Каждый год' };
+  return map[repeatType] || repeatType;
+}
+
+/**
+ * Создаёт/пересоздаёт серию: отдельная строка на каждую дату.
+ * Правило лежит в instruction мастера (__RR__), клоны помечаются __OCC__.
+ */
+function saveRepeatingEvent(editingUid, data) {
+  let seriesId = null;
+  if (editingUid) {
+    const old = state.events.find(e => e.uid === editingUid);
+    seriesId = getSeriesId(old);
+    if (seriesId) {
+      eventsInSeries(seriesId).forEach(e => softDelete(e.uid));
+    } else if (old) {
+      softDelete(old.uid);
+    }
+  }
+  if (!seriesId) seriesId = 'ser_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+
+  const dates = expandOccurrenceDates(data.event_date, data.repeat_type, data.repeat_rule);
+  if (!dates.length) dates.push(data.event_date);
+
+  const ruleWithSid = data.repeat_type === 'custom' && data.repeat_rule
+    ? Object.assign({}, data.repeat_rule, { series_id: seriesId })
+    : (data.repeat_type !== 'none' ? { series_id: seriesId, preset: data.repeat_type } : null);
+
+  const summary = formatRepeatSummaryForSheet(data.repeat_type, data.repeat_rule);
+  const baseComment = (data.comment || '').replace(/^Повтор:[^\n]*\n?/, '').trim();
+
+  dates.forEach((ds, idx) => {
+    const isMaster = idx === 0;
+    const payload = {
+      exerciseName: data.exerciseName,
+      groupName: data.groupName,
+      color: data.color,
+      event_date: ds,
+      start_time: data.start_time,
+      end_time: data.end_time,
+      location: data.location || '',
+      comment: isMaster && summary
+        ? ('Повтор: ' + summary + (baseComment ? '\n' + baseComment : ''))
+        : baseComment,
+      is_all_day: data.is_all_day,
+      series_id: seriesId,
+      series_role: isMaster ? 'master' : 'occurrence',
+      repeat_type: isMaster ? data.repeat_type : 'none',
+      repeat_rule: isMaster ? (data.repeat_type === 'custom' ? ruleWithSid : ruleWithSid) : null
+    };
+    // Для non-custom мастера тоже сохраняем meta серии в instruction через pack
+    if (isMaster && data.repeat_type !== 'custom' && data.repeat_type !== 'none') {
+      payload.repeat_type = 'custom';
+      payload.repeat_rule = {
+        series_id: seriesId,
+        preset: data.repeat_type,
+        interval: 1,
+        unit: data.repeat_type === 'daily' ? 'day'
+          : data.repeat_type === 'weekly' ? 'week'
+          : data.repeat_type === 'monthly' ? 'month' : 'year',
+        weekdays: data.repeat_type === 'weekly' ? [((parseDate(data.event_date).getDay() + 6) % 7)] : [],
+        endType: 'date',
+        endDate: dates[dates.length - 1],
+        endCount: dates.length
+      };
+    }
+    addEvent(payload);
+  });
+
+  return dates.length;
+}
+
+/** Упаковка repeat_rule / серии в instruction для синхронизации с таблицей */
 function packRepeatRule(ev) {
   if (!ev) return;
   let base = ev.instruction || '';
-  if (base.indexOf('__RR__') === 0) {
+  if (base.indexOf('__RR__') === 0 || base.indexOf('__OCC__') === 0) {
     const nl = base.indexOf('\n');
     base = nl >= 0 ? base.slice(nl + 1) : '';
   }
-  if (ev.repeat_type === 'custom' && ev.repeat_rule) {
-    ev.instruction = '__RR__' + JSON.stringify(ev.repeat_rule) + (base ? '\n' + base : '');
+  if (ev.series_role === 'occurrence' && ev.series_id) {
+    ev.instruction = '__OCC__' + ev.series_id + (base ? '\n' + base : '');
+    ev.repeat_type = 'none';
+    ev.repeat_rule = null;
+    return;
+  }
+  if (ev.repeat_type && ev.repeat_type !== 'none' && ev.repeat_rule) {
+    const rule = Object.assign({}, ev.repeat_rule);
+    if (ev.series_id) rule.series_id = ev.series_id;
+    ev.instruction = '__RR__' + JSON.stringify(rule) + (base ? '\n' + base : '');
+    if (ev.repeat_type !== 'custom') ev.repeat_type = 'custom';
+  } else if (ev.series_id && ev.series_role === 'master') {
+    ev.instruction = '__RR__' + JSON.stringify({ series_id: ev.series_id }) + (base ? '\n' + base : '');
   } else {
     ev.instruction = base;
     if (ev.repeat_type !== 'custom') ev.repeat_rule = null;
@@ -3359,13 +3551,28 @@ function packRepeatRule(ev) {
 function unpackRepeatRule(ev) {
   if (!ev) return;
   const raw = ev.instruction || '';
+  if (raw.indexOf('__OCC__') === 0) {
+    const nl = raw.indexOf('\n');
+    ev.series_id = (nl >= 0 ? raw.slice(6, nl) : raw.slice(6)).trim();
+    ev.series_role = 'occurrence';
+    ev.instruction = nl >= 0 ? raw.slice(nl + 1) : '';
+    ev.repeat_type = 'none';
+    ev.repeat_rule = null;
+    return;
+  }
   if (raw.indexOf('__RR__') === 0) {
     const nl = raw.indexOf('\n');
     const jsonPart = nl >= 0 ? raw.slice(5, nl) : raw.slice(5);
     const rest = nl >= 0 ? raw.slice(nl + 1) : '';
     try {
       ev.repeat_rule = JSON.parse(jsonPart);
-      if (ev.repeat_type === 'custom' || !ev.repeat_type) ev.repeat_type = 'custom';
+      if (ev.repeat_type === 'custom' || !ev.repeat_type || ev.repeat_type === 'none') {
+        ev.repeat_type = 'custom';
+      }
+      if (ev.repeat_rule && ev.repeat_rule.series_id) {
+        ev.series_id = ev.repeat_rule.series_id;
+        ev.series_role = 'master';
+      }
     } catch (e) {
       ev.repeat_rule = null;
     }
@@ -4490,7 +4697,21 @@ function saveEdit() {
     repeat_rule: repeatRule
   };
 
-  if (state.editingUid) {
+  if (repeatType && repeatType !== 'none') {
+    const n = saveRepeatingEvent(state.editingUid, data);
+    showToast('Серия: ' + n + ' событий создано');
+  } else if (state.editingUid) {
+    const old = state.events.find(e => e.uid === state.editingUid);
+    const sid = getSeriesId(old);
+    // Сняли повтор — удаляем остальные клоны серии
+    if (sid) {
+      eventsInSeries(sid).forEach(e => {
+        if (e.uid !== state.editingUid) softDelete(e.uid);
+      });
+      data.series_id = null;
+      data.series_role = null;
+      data.repeat_rule = null;
+    }
     updateEvent(state.editingUid, data);
     showToast('Сохранено');
   } else {
@@ -4499,7 +4720,6 @@ function saveEdit() {
   }
   closeEdit();
   render();
-  // Синк после сохранения — очередь uid сохранится до merge
   if (navigator.onLine) sync();
 }
 
@@ -4541,6 +4761,10 @@ function openDetail(eventUid) {
     };
     html += '<div class="detail-field"><div class="label">Повторение</div><div class="value">' +
       esc(rt[ev.repeat_type] || ev.repeat_type) + '</div></div>';
+  } else if (getSeriesId(ev)) {
+    const n = eventsInSeries(getSeriesId(ev)).length;
+    html += '<div class="detail-field"><div class="label">Серия</div><div class="value">' +
+      n + ' событий</div></div>';
   }
 
   // Чекбокс «выполнено»
@@ -4592,7 +4816,7 @@ function closeDetail() {
 function startDelete() {
   const ev = state.events.find(e => e.uid === state.detailUid);
   if (!ev) return;
-  if (ev.repeat_type && ev.repeat_type !== 'none') {
+  if ((ev.repeat_type && ev.repeat_type !== 'none') || getSeriesId(ev)) {
     document.getElementById('dialogDelete').classList.add('open');
   } else {
     if (confirm('Удалить событие «' + getTitle(ev) + '»?')) {
@@ -4609,18 +4833,23 @@ document.getElementById('btnConfirmDelete').onclick = () => {
   const mode = (document.querySelector('input[name="delMode"]:checked') || {}).value || 'this';
   const ev = state.events.find(e => e.uid === state.detailUid);
   if (!ev) return;
+  const sid = getSeriesId(ev);
 
   if (mode === 'this') {
     softDelete(ev.uid);
+  } else if (sid) {
+    eventsInSeries(sid).forEach(e => {
+      if (mode === 'future' && e.event_date < ev.event_date) return;
+      softDelete(e.uid);
+    });
   } else if (mode === 'future') {
-    // Удаляем текущее и все будущие с тем же названием/типом/повтором
     activeEvents().filter(e =>
       e.repeat_type === ev.repeat_type &&
       e.exerciseName === ev.exerciseName &&
       e.groupName === ev.groupName &&
       e.event_date >= ev.event_date
     ).forEach(e => softDelete(e.uid));
-  } else if (mode === 'all') {
+  } else {
     activeEvents().filter(e =>
       e.repeat_type === ev.repeat_type &&
       e.exerciseName === ev.exerciseName &&
@@ -5259,7 +5488,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=12').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=13').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
