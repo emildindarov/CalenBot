@@ -2860,16 +2860,29 @@ function normalizeEventDate(v) {
   if (v == null || v === '') return '';
   if (typeof v === 'string') {
     const s = v.replace(/^'/, '').trim();
+    // Полный ISO с временем — берём ЛОКАЛЬНЫЙ календарный день (иначе UTC сдвигает сутки)
+    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return toDateStr(d);
+    }
     const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
     if (m) return m[1];
+    const dm = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+    if (dm) return dm[3] + '-' + pad(+dm[2]) + '-' + pad(+dm[1]);
     const d = new Date(s);
-    if (!isNaN(d.getTime())) {
-      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-    }
+    if (!isNaN(d.getTime())) return toDateStr(d);
     return s;
   }
-  if (v instanceof Date && !isNaN(v.getTime())) {
-    return v.getFullYear() + '-' + pad(v.getMonth() + 1) + '-' + pad(v.getDate());
+  if (v instanceof Date && !isNaN(v.getTime())) return toDateStr(v);
+  return String(v);
+}
+
+function normalizeTimeStr(v) {
+  if (v == null || v === '') return '';
+  if (typeof v === 'string') {
+    const m = v.trim().match(/(\d{1,2}):(\d{2})/);
+    if (m) return pad(+m[1]) + ':' + m[2];
+    return v.substring(0, 5);
   }
   return String(v);
 }
@@ -2884,15 +2897,10 @@ async function mergeRemote(remoteRows) {
   const remoteMap = {};
   (remoteRows || []).forEach(r => {
     if (!r || !r.uid) return;
-    r.uid = String(r.uid);
+    r.uid = String(r.uid).trim();
     r.event_date = normalizeEventDate(r.event_date);
-    if (typeof r.start_time === 'string' && r.start_time.length > 5) {
-      r.start_time = r.start_time.substring(0, 5);
-    }
-    if (typeof r.end_time === 'string' && r.end_time.length > 5) {
-      r.end_time = r.end_time.substring(0, 5);
-    }
-    // Нормализация булевых полей из таблицы
+    r.start_time = normalizeTimeStr(r.start_time);
+    r.end_time = normalizeTimeStr(r.end_time);
     r.is_deleted = r.is_deleted === true || r.is_deleted === 'TRUE' || r.is_deleted === 'true';
     r.is_all_day = r.is_all_day === true || r.is_all_day === 'TRUE' || r.is_all_day === 'true';
     if (typeof r.sets === 'string') r.sets = +r.sets || 0;
@@ -2905,37 +2913,49 @@ async function mergeRemote(remoteRows) {
   const merged = [];
   const queuedUids = new Set(state.queue.map(c => String(c.uid)));
 
-  // Все uid из обеих сторон
+  // Если дата с сервера сдвинута ровно на ±1 день — типичный TZ-баг Sheets
+  function healRemoteDate(loc, rem) {
+    if (!loc || !rem || !loc.event_date || !rem.event_date) return rem;
+    if (loc.event_date === rem.event_date) return rem;
+    const ld = parseDate(loc.event_date);
+    const rd = parseDate(rem.event_date);
+    if (!ld || !rd) return rem;
+    if (Math.abs(ld.getTime() - rd.getTime()) === 86400000) {
+      rem = Object.assign({}, rem, { event_date: loc.event_date });
+    }
+    return rem;
+  }
+
   const allUids = new Set([...Object.keys(localMap), ...Object.keys(remoteMap)]);
 
   for (const id of allUids) {
     const loc = localMap[id];
-    const rem = remoteMap[id];
+    let rem = remoteMap[id];
+    if (loc && rem) rem = healRemoteDate(loc, rem);
 
     if (loc && !rem) {
-      // Локальное без сервера — всегда оставляем (новое / ещё не доехало)
       merged.push(loc);
     } else if (!loc && rem) {
-      if (!rem.is_deleted) merged.push(rem);
-      else merged.push(rem);
+      merged.push(rem);
     } else if (loc && rem) {
       const locTs = String(loc.last_modified || '');
       const remTs = String(rem.last_modified || '');
-      // Если с сервера пришла «пустая» оболочка — не затираем локальное
       const remEmpty = !(rem.exerciseName || rem.event_date);
       if (remEmpty && (loc.exerciseName || loc.event_date) && !rem.is_deleted) {
         merged.push(loc);
       } else if (queuedUids.has(id)) {
         merged.push(loc);
-      } else if (!locTs || !remTs || locTs === remTs) {
-        merged.push(rem.is_deleted ? rem : (locTs >= remTs ? loc : rem));
+      } else if (rem.is_deleted && (!locTs || remTs >= locTs)) {
+        merged.push(rem);
+      } else if (!locTs || !remTs || locTs >= remTs) {
+        // При равных/локально новее — оставляем локальное (оно только что сохранено)
+        const keep = Object.assign({}, rem.is_deleted ? rem : loc);
+        if (!rem.is_deleted && rem.event_date && !keep.event_date) keep.event_date = rem.event_date;
+        merged.push(keep);
       } else if (locTs > remTs) {
-        if (remTs && !queuedUids.has(id)) {
-          conflicts.push({ local: loc, remote: rem });
-        }
+        if (remTs && !queuedUids.has(id)) conflicts.push({ local: loc, remote: rem });
         merged.push(loc);
       } else {
-        // rem новее
         merged.push(rem);
       }
     }
@@ -2961,6 +2981,8 @@ async function mergeRemote(remoteRows) {
   state.events.forEach(e => {
     e.uid = String(e.uid);
     e.event_date = normalizeEventDate(e.event_date);
+    e.start_time = normalizeTimeStr(e.start_time);
+    e.end_time = normalizeTimeStr(e.end_time);
     unpackRepeatRule(e);
   });
   saveEvents();
