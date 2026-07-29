@@ -1,5 +1,5 @@
 /* CalenBot — минимальный service worker для установки PWA */
-const CACHE = 'calenbot-v4';
+const CACHE = 'calenbot-v5';
 const ASSETS = [
   './',
   './index.html',

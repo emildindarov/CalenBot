@@ -2828,7 +2828,13 @@ async function fetchRemote() {
   });
   if (!resp.ok) throw new Error('HTTP ' + resp.status);
   const data = await resp.json();
-  return Array.isArray(data) ? data : (data.rows || data.data || []);
+  if (data && typeof data === 'object' && data.success === false) {
+    throw new Error(data.error || 'Ошибка сервера');
+  }
+  if (!Array.isArray(data)) {
+    throw new Error('Некорректный ответ сервера');
+  }
+  return data;
 }
 
 async function pushQueue() {
@@ -2850,16 +2856,45 @@ async function pushQueue() {
   throw new Error(result && result.error ? result.error : 'Ошибка сервера');
 }
 
+function normalizeEventDate(v) {
+  if (v == null || v === '') return '';
+  if (typeof v === 'string') {
+    const s = v.replace(/^'/, '').trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
+    return s;
+  }
+  if (v instanceof Date && !isNaN(v.getTime())) {
+    return v.getFullYear() + '-' + pad(v.getMonth() + 1) + '-' + pad(v.getDate());
+  }
+  return String(v);
+}
+
 /** Слияние удалённых и локальных данных с разрешением конфликтов */
 async function mergeRemote(remoteRows) {
   const localMap = {};
-  state.events.forEach(e => { localMap[e.uid] = e; });
+  state.events.forEach(e => {
+    if (e && e.uid) localMap[String(e.uid)] = e;
+  });
 
   const remoteMap = {};
   (remoteRows || []).forEach(r => {
+    if (!r || !r.uid) return;
+    r.uid = String(r.uid);
+    r.event_date = normalizeEventDate(r.event_date);
+    if (typeof r.start_time === 'string' && r.start_time.length > 5) {
+      r.start_time = r.start_time.substring(0, 5);
+    }
+    if (typeof r.end_time === 'string' && r.end_time.length > 5) {
+      r.end_time = r.end_time.substring(0, 5);
+    }
     // Нормализация булевых полей из таблицы
-    r.is_deleted = r.is_deleted === true || r.is_deleted === 'TRUE';
-    r.is_all_day = r.is_all_day === true || r.is_all_day === 'TRUE';
+    r.is_deleted = r.is_deleted === true || r.is_deleted === 'TRUE' || r.is_deleted === 'true';
+    r.is_all_day = r.is_all_day === true || r.is_all_day === 'TRUE' || r.is_all_day === 'true';
     if (typeof r.sets === 'string') r.sets = +r.sets || 0;
     if (typeof r.reps === 'string') r.reps = +r.reps || 0;
     unpackRepeatRule(r);
@@ -2868,7 +2903,7 @@ async function mergeRemote(remoteRows) {
 
   const conflicts = [];
   const merged = [];
-  const queuedUids = new Set(state.queue.map(c => c.uid));
+  const queuedUids = new Set(state.queue.map(c => String(c.uid)));
 
   // Все uid из обеих сторон
   const allUids = new Set([...Object.keys(localMap), ...Object.keys(remoteMap)]);
@@ -2878,36 +2913,30 @@ async function mergeRemote(remoteRows) {
     const rem = remoteMap[id];
 
     if (loc && !rem) {
-      // Есть локально, нет на сервере
-      if (loc.is_deleted) {
-        // уже удалено локально — оставляем
-        merged.push(loc);
-      } else if (queuedUids.has(id)) {
-        // ждёт отправки — оставляем локальное
-        merged.push(loc);
-      } else {
-        // было удалено на сервере или никогда не синхронизировалось
-        // если last_modified локальный свежий и в очереди нет — оставляем (новое локальное)
-        merged.push(loc);
-      }
+      // Локальное без сервера — всегда оставляем (новое / ещё не доехало)
+      merged.push(loc);
     } else if (!loc && rem) {
       if (!rem.is_deleted) merged.push(rem);
+      else merged.push(rem);
     } else if (loc && rem) {
-      const locTs = loc.last_modified || '';
-      const remTs = rem.last_modified || '';
-      if (locTs === remTs) {
-        merged.push(rem.is_deleted ? rem : rem);
-      } else if (queuedUids.has(id) && locTs > remTs) {
+      const locTs = String(loc.last_modified || '');
+      const remTs = String(rem.last_modified || '');
+      // Если с сервера пришла «пустая» оболочка — не затираем локальное
+      const remEmpty = !(rem.exerciseName || rem.event_date);
+      if (remEmpty && (loc.exerciseName || loc.event_date) && !rem.is_deleted) {
         merged.push(loc);
-      } else if (locTs > remTs && remTs && locTs !== remTs && queuedUids.has(id) === false) {
-        // оба изменились независимо — конфликт
-        conflicts.push({ local: loc, remote: rem });
-        merged.push(loc); // временно локальное, пока пользователь не выберет
-      } else if (remTs >= locTs) {
-        if (!rem.is_deleted) merged.push(rem);
-        else merged.push(rem); // мягкое удаление
+      } else if (queuedUids.has(id)) {
+        merged.push(loc);
+      } else if (!locTs || !remTs || locTs === remTs) {
+        merged.push(rem.is_deleted ? rem : (locTs >= remTs ? loc : rem));
+      } else if (locTs > remTs) {
+        if (remTs && !queuedUids.has(id)) {
+          conflicts.push({ local: loc, remote: rem });
+        }
+        merged.push(loc);
       } else {
-        merged.push(loc);
+        // rem новее
+        merged.push(rem);
       }
     }
   }
@@ -2915,10 +2944,9 @@ async function mergeRemote(remoteRows) {
   // Разрешение конфликтов по очереди
   for (const c of conflicts) {
     const choice = await askConflict(c);
-    const idx = merged.findIndex(e => e.uid === c.local.uid);
+    const idx = merged.findIndex(e => String(e.uid) === String(c.local.uid));
     if (choice === 'local') {
       if (idx >= 0) merged[idx] = c.local;
-      // Отправляем локальную версию
       enqueue({ action: 'update', uid: c.local.uid, changes: c.local });
     } else {
       if (idx >= 0) {
@@ -2930,8 +2958,11 @@ async function mergeRemote(remoteRows) {
 
   state.events = merged.filter(e => e.is_deleted !== true && e.is_deleted !== 'TRUE')
     .concat(merged.filter(e => e.is_deleted === true || e.is_deleted === 'TRUE'));
-  // Храним и удалённые для синхронизации, но фильтруем при отображении
-  state.events.forEach(unpackRepeatRule);
+  state.events.forEach(e => {
+    e.uid = String(e.uid);
+    e.event_date = normalizeEventDate(e.event_date);
+    unpackRepeatRule(e);
+  });
   saveEvents();
 }
 
