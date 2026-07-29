@@ -461,19 +461,64 @@
       letter-spacing: -0.02em;
     }
 
-    .date-nav .today-btn {
-      font-size: 12px;
-      font-weight: 700;
-      color: #1c1f2a;
-      padding: 8px 16px;
-      border-radius: 999px;
-      border: none;
-      width: auto;
-      height: auto;
-      background: var(--lime);
-      box-shadow: 3px 4px 12px rgba(200, 240, 0, 0.35);
+    .date-nav .today-cal-btn {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      border-radius: 14px;
+      background: var(--glass-strong);
+      box-shadow: var(--shadow-out-sm);
+      border: 1px solid rgba(255,255,255,0.55);
+      color: #94a3b8;
+      position: relative;
     }
-    .date-nav .today-btn:active { box-shadow: var(--shadow-in-sm); }
+    .date-nav .today-cal-btn .cal-check { display: none; }
+    .date-nav .today-cal-btn .cal-week-num { display: none; }
+    .date-nav .today-cal-btn.is-past { color: #94a3b8; }
+    .date-nav .today-cal-btn.is-today {
+      color: #16a34a;
+      background: rgba(22, 163, 74, 0.12);
+      border-color: rgba(22, 163, 74, 0.35);
+      box-shadow: 3px 4px 12px rgba(22, 163, 74, 0.2);
+    }
+    .date-nav .today-cal-btn.is-future {
+      color: #2563eb;
+      background: rgba(37, 99, 235, 0.1);
+      border-color: rgba(37, 99, 235, 0.3);
+    }
+    .date-nav .today-cal-btn:active { box-shadow: var(--shadow-in-sm); }
+    .date-nav .today-cal-btn .ico-cal {
+      width: 22px;
+      height: 22px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .date-nav .today-cal-btn .ico-cal .cal-check { stroke-width: 2.2; }
+    .date-nav .today-cal-btn.mode-week .cal-check,
+    .date-nav .today-cal-btn.mode-day .cal-check { display: none !important; }
+    .date-nav .today-cal-btn.mode-week .cal-week-num,
+    .date-nav .today-cal-btn.mode-day .cal-week-num {
+      display: block;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 15px;
+      text-align: center;
+      font-size: 9px;
+      font-weight: 800;
+      line-height: 1;
+      color: currentColor;
+      pointer-events: none;
+      letter-spacing: -0.03em;
+      text-transform: lowercase;
+    }
+    .date-nav .today-cal-btn.mode-week .cal-week-num {
+      font-size: 10px;
+      text-transform: none;
+    }
 
     /* ─── Основная область ─── */
     .main {
@@ -2066,7 +2111,15 @@
     <button id="btnNext" title="Вперёд" aria-label="Вперёд">
       <svg class="ico" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
     </button>
-    <button class="today-btn" id="btnToday">Сегодня</button>
+    <button class="today-cal-btn" id="btnToday" title="Перейти к сегодня" aria-label="Сегодня">
+      <svg class="ico-cal" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/>
+        <path d="M3.5 9.5h17"/>
+        <path d="M8 3.5v3.5M16 3.5v3.5"/>
+        <path class="cal-check" d="M8.5 14.5l2.4 2.4 4.6-5"/>
+      </svg>
+      <span class="cal-week-num" id="btnTodayWeekNum" aria-hidden="true"></span>
+    </button>
   </nav>
 
   <!-- Основная область -->
@@ -3708,6 +3761,63 @@ function renderDateNav() {
       ', ' + WEEKDAYS_SHORT[(d.getDay() + 6) % 7];
   } else {
     label.textContent = 'Поиск';
+  }
+
+  const btn = document.getElementById('btnToday');
+  if (btn) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const cur = new Date(d);
+    cur.setHours(0, 0, 0, 0);
+    const weekNumEl = document.getElementById('btnTodayWeekNum');
+    btn.classList.remove('is-past', 'is-today', 'is-future', 'mode-week', 'mode-day');
+
+    if (state.view === 'week') {
+      btn.classList.add('mode-week');
+      const curMon = weekMonday(cur);
+      const todayMon = weekMonday(today);
+      const wn = isoWeekNum(cur);
+      if (weekNumEl) weekNumEl.textContent = String(wn);
+      btn.setAttribute('aria-label', 'Неделя ' + wn + ', к текущей неделе');
+      if (curMon.getTime() === todayMon.getTime()) {
+        btn.classList.add('is-today');
+        btn.title = 'Текущая неделя · ' + wn;
+      } else if (curMon < todayMon) {
+        btn.classList.add('is-past');
+        btn.title = 'К текущей неделе · сейчас смотрите ' + wn;
+      } else {
+        btn.classList.add('is-future');
+        btn.title = 'К текущей неделе · сейчас смотрите ' + wn;
+      }
+    } else if (state.view === 'day') {
+      btn.classList.add('mode-day');
+      const wd = WEEKDAYS_SHORT[(cur.getDay() + 6) % 7].toLowerCase();
+      if (weekNumEl) weekNumEl.textContent = wd;
+      btn.setAttribute('aria-label', wd + ', к сегодняшнему дню');
+      if (sameDay(cur, today)) {
+        btn.classList.add('is-today');
+        btn.title = 'Сегодня · ' + wd;
+      } else if (cur < today) {
+        btn.classList.add('is-past');
+        btn.title = 'К сегодняшнему дню · ' + wd;
+      } else {
+        btn.classList.add('is-future');
+        btn.title = 'К сегодняшнему дню · ' + wd;
+      }
+    } else {
+      if (weekNumEl) weekNumEl.textContent = '';
+      btn.setAttribute('aria-label', 'Сегодня');
+      if (sameDay(cur, today)) {
+        btn.classList.add('is-today');
+        btn.title = 'Сегодня';
+      } else if (cur < today) {
+        btn.classList.add('is-past');
+        btn.title = 'К сегодняшнему дню';
+      } else {
+        btn.classList.add('is-future');
+        btn.title = 'К сегодняшнему дню';
+      }
+    }
   }
 }
 
@@ -5488,7 +5598,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=13').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=16').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
