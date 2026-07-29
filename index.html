@@ -1344,8 +1344,8 @@
       position: absolute;
       left: 2px;
       right: 2px;
-      border-radius: 12px;
-      padding: 4px 5px;
+      border-radius: 10px;
+      padding: 2px 4px;
       color: #3d3568;
       font-size: 10px;
       font-weight: 700;
@@ -1353,8 +1353,9 @@
       cursor: pointer;
       z-index: 2;
       box-shadow: 2px 3px 8px rgba(108, 92, 231, 0.12);
-      line-height: 1.2;
-      min-height: 16px;
+      line-height: 1.15;
+      min-height: 0;
+      box-sizing: border-box;
       border: 1px solid rgba(255,255,255,0.5);
     }
 
@@ -1499,19 +1500,21 @@
       position: absolute;
       left: 48px;
       right: 8px;
-      border-radius: 16px;
-      padding: 6px 10px;
+      border-radius: 12px;
+      padding: 2px 8px;
       color: #3d3568;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       overflow: hidden;
       cursor: pointer;
       z-index: 2;
-      box-shadow: 4px 6px 14px rgba(108, 92, 231, 0.15);
-      min-height: 22px;
+      box-shadow: 3px 4px 10px rgba(108, 92, 231, 0.12);
+      min-height: 0;
+      box-sizing: border-box;
       display: flex;
       align-items: flex-start;
       border: 1px solid rgba(255,255,255,0.55);
+      line-height: 1.2;
     }
 
     .tl-event.done { opacity: 0.55; }
@@ -2887,97 +2890,159 @@ function normalizeTimeStr(v) {
   return String(v);
 }
 
-/** Слияние удалённых и локальных данных с разрешением конфликтов */
-async function mergeRemote(remoteRows) {
+/** Сравнимый timestamp (мс). Битые/локальные строки Sheets → 0 */
+function tsMs(v) {
+  if (v == null || v === '') return 0;
+  if (typeof v === 'number' && isFinite(v)) return v;
+  const s = String(v).trim();
+  const t = Date.parse(s);
+  if (!isNaN(t)) return t;
+  // 29.07.2026 15:04:05
+  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) {
+    return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime();
+  }
+  return 0;
+}
+
+function isValidYmd(s) {
+  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+function normalizeIncomingEvent(r) {
+  if (!r || !r.uid) return null;
+  const e = Object.assign({}, r);
+  e.uid = String(e.uid).trim();
+  e.event_date = normalizeEventDate(e.event_date);
+  e.start_time = normalizeTimeStr(e.start_time);
+  e.end_time = normalizeTimeStr(e.end_time);
+  e.is_deleted = e.is_deleted === true || e.is_deleted === 'TRUE' || e.is_deleted === 'true';
+  e.is_all_day = e.is_all_day === true || e.is_all_day === 'TRUE' || e.is_all_day === 'true';
+  if (typeof e.sets === 'string') e.sets = +e.sets || 0;
+  if (typeof e.reps === 'string') e.reps = +e.reps || 0;
+  unpackRepeatRule(e);
+  return e;
+}
+
+/**
+ * Слияние: локальные события не пропадают.
+ * Сервер побеждает только если новее по времени И есть валидная дата.
+ * @param {Array} remoteRows
+ * @param {Set<string>} [justPushedUids] uid из очереди ДО push (очередь уже может быть пуста)
+ */
+async function mergeRemote(remoteRows, justPushedUids) {
+  const localSnapshot = state.events.map(e => Object.assign({}, e));
   const localMap = {};
-  state.events.forEach(e => {
+  localSnapshot.forEach(e => {
     if (e && e.uid) localMap[String(e.uid)] = e;
   });
 
   const remoteMap = {};
-  (remoteRows || []).forEach(r => {
-    if (!r || !r.uid) return;
-    r.uid = String(r.uid).trim();
-    r.event_date = normalizeEventDate(r.event_date);
-    r.start_time = normalizeTimeStr(r.start_time);
-    r.end_time = normalizeTimeStr(r.end_time);
-    r.is_deleted = r.is_deleted === true || r.is_deleted === 'TRUE' || r.is_deleted === 'true';
-    r.is_all_day = r.is_all_day === true || r.is_all_day === 'TRUE' || r.is_all_day === 'true';
-    if (typeof r.sets === 'string') r.sets = +r.sets || 0;
-    if (typeof r.reps === 'string') r.reps = +r.reps || 0;
-    unpackRepeatRule(r);
-    remoteMap[r.uid] = r;
+  (remoteRows || []).forEach(raw => {
+    const r = normalizeIncomingEvent(raw);
+    if (r) remoteMap[r.uid] = r;
   });
 
+  const queuedUids = new Set([
+    ...(justPushedUids || []),
+    ...state.queue.map(c => String(c.uid))
+  ]);
   const conflicts = [];
   const merged = [];
-  const queuedUids = new Set(state.queue.map(c => String(c.uid)));
-
-  // Если дата с сервера сдвинута ровно на ±1 день — типичный TZ-баг Sheets
-  function healRemoteDate(loc, rem) {
-    if (!loc || !rem || !loc.event_date || !rem.event_date) return rem;
-    if (loc.event_date === rem.event_date) return rem;
-    const ld = parseDate(loc.event_date);
-    const rd = parseDate(rem.event_date);
-    if (!ld || !rd) return rem;
-    if (Math.abs(ld.getTime() - rd.getTime()) === 86400000) {
-      rem = Object.assign({}, rem, { event_date: loc.event_date });
-    }
-    return rem;
-  }
-
   const allUids = new Set([...Object.keys(localMap), ...Object.keys(remoteMap)]);
 
   for (const id of allUids) {
     const loc = localMap[id];
     let rem = remoteMap[id];
-    if (loc && rem) rem = healRemoteDate(loc, rem);
+
+    // Починка сдвига даты ±1 день
+    if (loc && rem && isValidYmd(loc.event_date) && isValidYmd(rem.event_date) &&
+        loc.event_date !== rem.event_date) {
+      const ld = parseDate(loc.event_date);
+      const rd = parseDate(rem.event_date);
+      if (ld && rd && Math.abs(ld.getTime() - rd.getTime()) === 86400000) {
+        rem = Object.assign({}, rem, { event_date: loc.event_date });
+      }
+    }
 
     if (loc && !rem) {
       merged.push(loc);
-    } else if (!loc && rem) {
+      continue;
+    }
+    if (!loc && rem) {
       merged.push(rem);
-    } else if (loc && rem) {
-      const locTs = String(loc.last_modified || '');
-      const remTs = String(rem.last_modified || '');
-      const remEmpty = !(rem.exerciseName || rem.event_date);
-      if (remEmpty && (loc.exerciseName || loc.event_date) && !rem.is_deleted) {
-        merged.push(loc);
-      } else if (queuedUids.has(id)) {
-        merged.push(loc);
-      } else if (rem.is_deleted && (!locTs || remTs >= locTs)) {
-        merged.push(rem);
-      } else if (!locTs || !remTs || locTs >= remTs) {
-        // При равных/локально новее — оставляем локальное (оно только что сохранено)
-        const keep = Object.assign({}, rem.is_deleted ? rem : loc);
-        if (!rem.is_deleted && rem.event_date && !keep.event_date) keep.event_date = rem.event_date;
-        merged.push(keep);
-      } else if (locTs > remTs) {
-        if (remTs && !queuedUids.has(id)) conflicts.push({ local: loc, remote: rem });
+      continue;
+    }
+
+    // оба есть
+    const locMs = tsMs(loc.last_modified);
+    const remMs = tsMs(rem.last_modified);
+    const locDel = loc.is_deleted === true || loc.is_deleted === 'TRUE';
+    const remUsable = !rem.is_deleted && (isValidYmd(rem.event_date) || !!rem.exerciseName);
+
+    if (queuedUids.has(id)) {
+      // Только что сохранили локально — не затираем
+      const keep = Object.assign({}, loc);
+      if (!isValidYmd(keep.event_date) && isValidYmd(rem.event_date)) keep.event_date = rem.event_date;
+      merged.push(keep);
+    } else if (rem.is_deleted && remMs >= locMs) {
+      merged.push(Object.assign({}, loc, { is_deleted: true, last_modified: rem.last_modified || loc.last_modified }));
+    } else if (locDel && remUsable) {
+      // На другом устройстве событие есть — поднимаем с сервера
+      merged.push(rem);
+    } else if (!remUsable) {
+      merged.push(loc);
+    } else if (remMs > locMs + 500) {
+      if (locMs && remMs && loc.exerciseName && rem.exerciseName &&
+          loc.exerciseName !== rem.exerciseName && !locDel) {
+        conflicts.push({ local: loc, remote: rem });
         merged.push(loc);
       } else {
-        merged.push(rem);
+        const take = Object.assign({}, rem);
+        if (!isValidYmd(take.event_date) && isValidYmd(loc.event_date)) take.event_date = loc.event_date;
+        if (!take.start_time && loc.start_time) take.start_time = loc.start_time;
+        if (!take.end_time && loc.end_time) take.end_time = loc.end_time;
+        if (!take.exerciseName && loc.exerciseName) take.exerciseName = loc.exerciseName;
+        merged.push(take);
       }
+    } else {
+      merged.push(loc);
     }
   }
 
-  // Разрешение конфликтов по очереди
   for (const c of conflicts) {
     const choice = await askConflict(c);
     const idx = merged.findIndex(e => String(e.uid) === String(c.local.uid));
     if (choice === 'local') {
       if (idx >= 0) merged[idx] = c.local;
       enqueue({ action: 'update', uid: c.local.uid, changes: c.local });
-    } else {
-      if (idx >= 0) {
-        if (c.remote.is_deleted) merged.splice(idx, 1);
-        else merged[idx] = c.remote;
-      }
+    } else if (idx >= 0) {
+      if (c.remote.is_deleted) merged[idx] = Object.assign({}, c.local, { is_deleted: true });
+      else merged[idx] = c.remote;
     }
   }
 
-  state.events = merged.filter(e => e.is_deleted !== true && e.is_deleted !== 'TRUE')
-    .concat(merged.filter(e => e.is_deleted === true || e.is_deleted === 'TRUE'));
+  // Страховка: активные локальные события не должны исчезнуть после merge
+  const byUid = {};
+  merged.forEach(e => { if (e && e.uid) byUid[String(e.uid)] = e; });
+  localSnapshot.forEach(ev => {
+    if (!ev || !ev.uid) return;
+    if (ev.is_deleted === true || ev.is_deleted === 'TRUE') return;
+    const id = String(ev.uid);
+    const cur = byUid[id];
+    if (!cur) {
+      byUid[id] = ev;
+    } else if (cur.is_deleted !== true && cur.is_deleted !== 'TRUE') {
+      if (!isValidYmd(cur.event_date) && isValidYmd(ev.event_date)) cur.event_date = ev.event_date;
+      if (!cur.exerciseName && ev.exerciseName) cur.exerciseName = ev.exerciseName;
+      if (!cur.start_time && ev.start_time) cur.start_time = ev.start_time;
+      if (!cur.end_time && ev.end_time) cur.end_time = ev.end_time;
+    }
+  });
+
+  const list = Object.values(byUid);
+  state.events = list.filter(e => e.is_deleted !== true && e.is_deleted !== 'TRUE')
+    .concat(list.filter(e => e.is_deleted === true || e.is_deleted === 'TRUE'));
   state.events.forEach(e => {
     e.uid = String(e.uid);
     e.event_date = normalizeEventDate(e.event_date);
@@ -3028,14 +3093,14 @@ async function sync(force) {
   updateSyncUI();
 
   try {
-    // 1. Отправляем очередь
+    // Запоминаем uid до очистки очереди — иначе merge затрёт только что сохранённое
+    const justPushed = new Set(state.queue.map(c => String(c.uid)));
     if (state.queue.length) {
       await pushQueue();
     }
-    // 2. Забираем данные
     const remote = await fetchRemote();
     if (remote) {
-      await mergeRemote(remote);
+      await mergeRemote(remote, justPushed);
       state.dataLoaded = true;
       state.initialSyncDone = true;
     }
@@ -3043,7 +3108,7 @@ async function sync(force) {
     updateSyncUI();
     render();
     updateOfflineStub();
-    if (force) showToast('Синхронизация завершена');
+    if (force) showToast('Синхронизация завершена · ' + activeEvents().length + ' событий');
   } catch (err) {
     console.error('Sync error:', err);
     state.syncStatus = navigator.onLine ? 'online' : 'offline';
@@ -3622,8 +3687,116 @@ function renderMonth() {
 }
 
 /* ─── Рендер: Неделя (шкала времени слева + 7 колонок) ─── */
-const PX_PER_MIN = 1.2;       // день
-const WEEK_PX_PER_MIN = 0.85; // неделя — чуть компактнее
+const PX_PER_MIN = 1.6;       // день
+const WEEK_PX_PER_MIN = 1.0;  // неделя
+const TL_GAP_PX = 2;
+
+function eventTimeSpan(ev) {
+  const start = timeToMinutes(ev.start_time);
+  let end = ev.end_time ? timeToMinutes(ev.end_time) : start + 60;
+  if (end == null || start == null) return null;
+  if (end <= start) end = start + 30;
+  return { start, end };
+}
+
+/**
+ * Раскладка событий на шкале:
+ * — высота по длительности, без наезда на следующее;
+ * — реально пересекающиеся по времени — в соседние колонки.
+ */
+function layoutTimelineEvents(evs, zoneOffsetMins, ppm) {
+  const items = (evs || []).map(ev => {
+    const span = eventTimeSpan(ev);
+    if (!span) return null;
+    return {
+      ev,
+      start: span.start,
+      end: span.end,
+      top: (span.start - zoneOffsetMins) * ppm,
+      col: 0,
+      colCount: 1,
+      height: Math.max((span.end - span.start) * ppm, 4)
+    };
+  }).filter(Boolean).sort((a, b) => a.start - b.start || a.end - b.end);
+
+  // Колонки для пересечений по времени
+  const colEnd = [];
+  items.forEach(item => {
+    let placed = false;
+    for (let c = 0; c < colEnd.length; c++) {
+      if (colEnd[c] <= item.start) {
+        item.col = c;
+        colEnd[c] = item.end;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      item.col = colEnd.length;
+      colEnd.push(item.end);
+    }
+  });
+
+  // Число колонок в кластере пересечений
+  items.forEach((item, i) => {
+    let maxCol = item.col;
+    for (let j = 0; j < items.length; j++) {
+      if (items[j].start < item.end && items[j].end > item.start) {
+        maxCol = Math.max(maxCol, items[j].col);
+      }
+    }
+    item.colCount = maxCol + 1;
+  });
+
+  // Высота: не залезать на следующее событие в той же колонке
+  items.forEach((item, i) => {
+    let height = (item.end - item.start) * ppm;
+    let nextStart = null;
+    for (let j = i + 1; j < items.length; j++) {
+      if (items[j].col === item.col && items[j].start >= item.start) {
+        nextStart = items[j].start;
+        break;
+      }
+    }
+    // Если одна колонка — также не наезжать на любое следующее по времени
+    if (item.colCount === 1) {
+      for (let j = i + 1; j < items.length; j++) {
+        if (items[j].start > item.start) {
+          nextStart = nextStart == null ? items[j].start : Math.min(nextStart, items[j].start);
+          break;
+        }
+      }
+    }
+    if (nextStart != null && nextStart > item.start) {
+      const maxH = Math.max(4, (nextStart - item.start) * ppm - TL_GAP_PX);
+      height = Math.min(Math.max(height, Math.min(14, maxH)), maxH);
+    } else {
+      height = Math.max(height, 14);
+    }
+    item.height = height;
+  });
+
+  return items;
+}
+
+function renderLaidOutTlEvent(item, ppm, className, fullWidth) {
+  const leftPad = fullWidth ? 48 : 2;
+  const rightPad = fullWidth ? 8 : 2;
+  const gap = 2;
+  const style = [
+    'top:' + item.top + 'px',
+    'height:' + item.height + 'px',
+    'background:' + getColor(item.ev)
+  ];
+  if (item.colCount > 1) {
+    const pct = 100 / item.colCount;
+    style.push('left:calc(' + leftPad + 'px + (100% - ' + (leftPad + rightPad) + 'px) * ' + (item.col / item.colCount) + ' + ' + gap + 'px)');
+    style.push('width:calc((100% - ' + (leftPad + rightPad) + 'px) / ' + item.colCount + ' - ' + (gap * 2) + 'px)');
+    style.push('right:auto');
+  }
+  return '<div class="' + className + (isDone(item.ev) ? ' done' : '') + '" data-uid="' + item.ev.uid +
+    '" style="' + style.join(';') + '"><span>' + esc(getTitle(item.ev)) + '</span></div>';
+}
 
 function renderWeek() {
   const grid = document.getElementById('weekGrid');
@@ -3710,7 +3883,9 @@ function renderWeek() {
         html += '<div class="week-tap-area" data-date="' + d.ds + '" data-mins="' + m +
           '" style="top:' + (m * ppm) + 'px;height:' + (30 * ppm) + 'px"></div>';
       }
-      d.night.forEach(ev => { html += renderWeekTlEvent(ev, 0, ppm); });
+      layoutTimelineEvents(d.night, 0, ppm).forEach(item => {
+        html += renderLaidOutTlEvent(item, ppm, 'week-tl-event', false);
+      });
       html += '</div>';
     });
     html += '</div></div>';
@@ -3737,7 +3912,9 @@ function renderWeek() {
       html += '<div class="week-tap-area" data-date="' + d.ds + '" data-mins="' + m +
         '" style="top:' + ((m - dsMins) * ppm) + 'px;height:' + (30 * ppm) + 'px"></div>';
     }
-    d.dayTimed.forEach(ev => { html += renderWeekTlEvent(ev, dsMins, ppm); });
+    layoutTimelineEvents(d.dayTimed, dsMins, ppm).forEach(item => {
+      html += renderLaidOutTlEvent(item, ppm, 'week-tl-event', false);
+    });
     html += '</div>';
   });
   html += '</div></div></div>';
@@ -3810,14 +3987,8 @@ function renderWeek() {
 }
 
 function renderWeekTlEvent(ev, zoneOffsetMins, ppm) {
-  const start = timeToMinutes(ev.start_time);
-  let end = ev.end_time ? timeToMinutes(ev.end_time) : start + 60;
-  if (end <= start) end = start + 30;
-  const top = (start - zoneOffsetMins) * ppm;
-  const height = Math.max((end - start) * ppm, 16);
-  return '<div class="week-tl-event' + (isDone(ev) ? ' done' : '') + '" data-uid="' + ev.uid +
-    '" style="top:' + top + 'px;height:' + height + 'px;background:' + getColor(ev) +
-    '"><span>' + esc(getTitle(ev)) + '</span></div>';
+  const items = layoutTimelineEvents([ev], zoneOffsetMins, ppm);
+  return items.length ? renderLaidOutTlEvent(items[0], ppm, 'week-tl-event', false) : '';
 }
 
 /* ─── Рендер: День ─── */
@@ -3872,8 +4043,8 @@ function renderDay() {
       html += '<div class="tl-tap-area" data-mins="' + m + '" style="top:' + (m * PX_PER_MIN) +
         'px;height:' + (30 * PX_PER_MIN) + 'px"></div>';
     }
-    nightEvs.forEach(ev => {
-      html += renderTlEvent(ev, 0);
+    layoutTimelineEvents(nightEvs, 0, PX_PER_MIN).forEach(item => {
+      html += renderLaidOutTlEvent(item, PX_PER_MIN, 'tl-event', true);
     });
     html += '</div>';
   } else {
@@ -3893,8 +4064,8 @@ function renderDay() {
     html += '<div class="tl-tap-area" data-mins="' + m + '" style="top:' + ((m - dsMins) * PX_PER_MIN) +
       'px;height:' + (30 * PX_PER_MIN) + 'px"></div>';
   }
-  dayTimed.forEach(ev => {
-    html += renderTlEvent(ev, dsMins);
+  layoutTimelineEvents(dayTimed, dsMins, PX_PER_MIN).forEach(item => {
+    html += renderLaidOutTlEvent(item, PX_PER_MIN, 'tl-event', true);
   });
   html += '</div></div>';
 
@@ -3954,14 +4125,8 @@ function renderDay() {
 }
 
 function renderTlEvent(ev, zoneOffsetMins) {
-  const start = timeToMinutes(ev.start_time);
-  let end = ev.end_time ? timeToMinutes(ev.end_time) : start + 60;
-  if (end <= start) end = start + 30;
-  const top = (start - zoneOffsetMins) * PX_PER_MIN;
-  const height = Math.max((end - start) * PX_PER_MIN, 22);
-  return '<div class="tl-event' + (isDone(ev) ? ' done' : '') + '" data-uid="' + ev.uid +
-    '" style="top:' + top + 'px;height:' + height + 'px;background:' + getColor(ev) +
-    '"><span>' + esc(getTitle(ev)) + '</span></div>';
+  const items = layoutTimelineEvents([ev], zoneOffsetMins, PX_PER_MIN);
+  return items.length ? renderLaidOutTlEvent(items[0], PX_PER_MIN, 'tl-event', true) : '';
 }
 
 /* ─── Поиск в футере ─── */
@@ -4174,9 +4339,9 @@ function saveEdit() {
     exerciseName: title,
     groupName: typeName,
     color: type ? type.color : '#e8e0ff',
-    event_date: dateStart,
-    start_time: allDay ? '' : (document.getElementById('fTimeStart').value || ''),
-    end_time: allDay ? '' : (document.getElementById('fTimeEnd').value || ''),
+    event_date: normalizeEventDate(dateStart),
+    start_time: allDay ? '' : normalizeTimeStr(document.getElementById('fTimeStart').value || ''),
+    end_time: allDay ? '' : normalizeTimeStr(document.getElementById('fTimeEnd').value || ''),
     location: document.getElementById('fLocation').value.trim(),
     comment: document.getElementById('fComment').value.trim(),
     is_all_day: allDay || !document.getElementById('fTimeStart').value,
@@ -4193,7 +4358,7 @@ function saveEdit() {
   }
   closeEdit();
   render();
-  // Попытка синхронизации
+  // Синк после сохранения — очередь uid сохранится до merge
   if (navigator.onLine) sync();
 }
 
@@ -4942,16 +5107,17 @@ function init() {
   switchView('home');
 
   if (navigator.onLine) {
-    sync();
+    if (!getScriptUrl()) {
+      showToast('На ПК нет URL синхронизации — откройте Настройки и вставьте тот же URL, что на телефоне', true);
+    } else {
+      sync();
+    }
   } else {
     updateOfflineStub();
-    if (!state.dataLoaded) {
-      // заглушка уже показана
-    }
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=9').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
