@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!-- CalenBot v1.1.5 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
+<!-- CalenBot v1.1.7 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -2256,7 +2256,7 @@
 
   <div class="app-splash" id="appSplash" aria-hidden="false">
     <img src="icon-512.png" alt="CalenBot" width="384" height="384">
-    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.5</div>
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.7</div>
   </div>
 
   <!-- Верхняя панель + навигация по датам -->
@@ -2657,7 +2657,7 @@ const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
 const APP_VER_MAJOR = 1;
 const APP_VER_MINOR = 1;
 const APP_BUILD_DATE = '2026-07-29';
-const APP_BUILD_ITER = 5;
+const APP_BUILD_ITER = 7;
 
 function getAppVersionString() {
   return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
@@ -4066,9 +4066,10 @@ function renderHome() {
   day.setHours(0, 0, 0, 0);
   const ds = toDateStr(day);
   const isToday = sameDay(day, today);
+  const past = isPastDay(day);
   const now = new Date();
   let dayEvs = eventsForDate(ds);
-  // На сегодня — только ещё не закончившиеся (и не done)
+  // Сегодня — только ещё не закончившиеся; прошлый/будущий день — все события дня
   if (isToday) {
     dayEvs = dayEvs.filter(ev => isEventRemainingNow(ev, now));
   }
@@ -4087,10 +4088,8 @@ function renderHome() {
     }
   });
 
-  // Сегодня: показываем только типы, у которых ещё есть события
-  const visibleTypes = isToday
-    ? types.filter(t => (counts[t.name] || 0) > 0)
-    : types;
+  // Блоки с нулём не показываем
+  const visibleTypes = types.filter(t => (counts[t.name] || 0) > 0);
 
   const yday = addDays(today, -1);
   const tmrw = addDays(today, 1);
@@ -4100,12 +4099,16 @@ function renderHome() {
   else if (sameDay(day, tmrw)) dayLabel = 'Завтра';
 
   let sectionTitle;
+  let emptyText;
   if (isToday) {
-    sectionTitle = visibleTypes.length
-      ? 'Осталось на сейчас'
-      : 'На сейчас ничего не осталось';
+    sectionTitle = visibleTypes.length ? 'Осталось на сейчас' : 'На сейчас ничего не осталось';
+    emptyText = 'Все события на сегодня уже прошли';
+  } else if (past) {
+    sectionTitle = visibleTypes.length ? 'Было в этот день' : 'В этот день событий не было';
+    emptyText = 'Событий не было';
   } else {
-    sectionTitle = 'У вас на этот день запланировано следующее';
+    sectionTitle = visibleTypes.length ? 'У вас на этот день запланировано следующее' : 'На этот день событий нет';
+    emptyText = 'Нет событий';
   }
 
   let html = '<div class="home-today-label">' + dayLabel + '</div>';
@@ -4115,17 +4118,15 @@ function renderHome() {
   html += '<div class="home-section-title">' + sectionTitle + '</div>';
   html += '<div class="home-types">';
 
-  if (isToday && !visibleTypes.length) {
-    html += '<div class="home-empty">Все события на сегодня уже прошли</div>';
-  } else if (!types.length) {
-    html += '<div class="home-empty">Типы событий не настроены</div>';
+  if (!visibleTypes.length) {
+    html += '<div class="home-empty">' + emptyText + '</div>';
   } else {
-    (visibleTypes.length ? visibleTypes : types).forEach(t => {
+    visibleTypes.forEach(t => {
       const n = counts[t.name] || 0;
       html += '<div class="home-type-card" data-type="' + esc(t.name) + '">';
       html += '<span class="home-type-dot" style="background:' + (t.color || '#e8e0ff') + '"></span>';
       html += '<span class="home-type-name">' + esc(t.name) + '</span>';
-      html += '<span class="home-type-count' + (n === 0 ? ' zero' : '') + '">' + n + '</span>';
+      html += '<span class="home-type-count">' + n + '</span>';
       html += '</div>';
     });
   }
@@ -5873,7 +5874,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=25').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=27').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
