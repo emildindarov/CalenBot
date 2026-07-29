@@ -112,18 +112,22 @@
 
     html, body {
       height: 100%;
+      min-height: 100%;
+      min-height: 100dvh;
       font-family: var(--font);
       color: var(--text);
       -webkit-tap-highlight-color: transparent;
       overscroll-behavior: none;
+      background: var(--body-bg);
+      background-attachment: fixed;
     }
 
     body {
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      background: var(--body-bg);
-      background-attachment: fixed;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      box-sizing: border-box;
     }
 
     button {
@@ -225,13 +229,15 @@
       justify-content: center;
       gap: 14px;
       height: calc(var(--footer-h) + env(safe-area-inset-bottom, 0px));
-      padding: 8px 16px max(10px, env(safe-area-inset-bottom, 0px));
+      padding: 8px 16px max(12px, env(safe-area-inset-bottom, 0px));
       box-sizing: border-box;
       pointer-events: none;
-      background: linear-gradient(to top, rgba(255,255,255,0.55) 40%, transparent);
+      background:
+        linear-gradient(to top, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.35) 55%, transparent 100%);
     }
     html[data-theme="dark"] .app-footer {
-      background: linear-gradient(to top, rgba(22, 24, 34, 0.72) 40%, transparent);
+      background:
+        linear-gradient(to top, rgba(28, 32, 46, 0.92) 0%, rgba(28, 32, 46, 0.45) 55%, transparent 100%);
     }
 
     .app-footer.search-open {
@@ -2336,6 +2342,7 @@
         <p class="settings-hint">Резервная копия событий и настроек в файл JSON</p>
         <button class="btn btn-ghost" id="btnExportData" style="width:100%">Экспорт в файл</button>
         <button class="btn btn-ghost" id="btnImportData" style="width:100%;margin-top:8px">Импорт из файла</button>
+        <button class="btn btn-ghost" id="btnClearDemo" style="width:100%;margin-top:8px">Очистить демо-данные</button>
         <input type="file" id="importFileInput" accept="application/json,.json" hidden>
       </div>
     </div>
@@ -2712,20 +2719,42 @@ function loadStore() {
   }
 }
 
-/** Заполнить демо-событиями из demo-data.js (пусто / ?demo=1 / обновление версии демо) */
+/** Демо только по ?demo=1; иначе удалить старые demo_* */
 function seedDemoIfNeeded() {
-  if (typeof buildDemoEvents !== 'function') return;
   const force = /(?:\?|&)demo=1(?:&|$)/.test(location.search);
-  const ver = String(typeof DEMO_DATA_VERSION !== 'undefined' ? DEMO_DATA_VERSION : 0);
-  const storedVer = localStorage.getItem('demo_data_version') || '';
-  const onlyDemo = state.events.length === 0 ||
-    state.events.every(e => String(e.uid || '').indexOf('demo_') === 0);
-  if (!force && state.events.length > 0 && !(onlyDemo && storedVer !== ver)) return;
-  state.events = buildDemoEvents(new Date());
-  state.events.forEach(unpackRepeatRule);
+  if (force && typeof buildDemoEvents === 'function') {
+    state.events = buildDemoEvents(new Date());
+    state.events.forEach(unpackRepeatRule);
+    saveEvents();
+    localStorage.setItem('demo_data_version', String(typeof DEMO_DATA_VERSION !== 'undefined' ? DEMO_DATA_VERSION : 0));
+    showToast('Загружены демо-данные');
+    return;
+  }
+  clearDemoEvents(false);
+}
+
+/** Удалить демо-события (uid начинается с demo_) */
+function clearDemoEvents(showMsg) {
+  const demos = state.events.filter(e =>
+    String(e.uid || '').indexOf('demo_') === 0 &&
+    e.is_deleted !== true && e.is_deleted !== 'TRUE'
+  );
+  localStorage.setItem('demo_data_version', 'cleared');
+  if (!demos.length) {
+    if (showMsg) showToast('Демо-данных нет');
+    return;
+  }
+  demos.forEach(ev => {
+    ev.is_deleted = true;
+    ev.last_modified = nowTs();
+    enqueue({ action: 'delete', uid: ev.uid });
+  });
   saveEvents();
-  localStorage.setItem('demo_data_version', ver);
-  if (force) showToast('Загружены демо-данные');
+  if (showMsg) {
+    showToast('Демо-данные удалены');
+    render();
+    if (navigator.onLine) sync();
+  }
 }
 
 function saveEvents() {
@@ -4819,6 +4848,10 @@ document.getElementById('importFileInput').onchange = e => {
   const file = e.target.files && e.target.files[0];
   e.target.value = '';
   importAppDataFile(file);
+};
+document.getElementById('btnClearDemo').onclick = () => {
+  if (!confirm('Удалить все демо-события?')) return;
+  clearDemoEvents(true);
 };
 
 /* ─── Online / Offline ─── */
