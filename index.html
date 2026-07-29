@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!-- CalenBot v1.1.7 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
+<!-- CalenBot v1.1.9 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -2256,7 +2256,7 @@
 
   <div class="app-splash" id="appSplash" aria-hidden="false">
     <img src="icon-512.png" alt="CalenBot" width="384" height="384">
-    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.7</div>
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.9</div>
   </div>
 
   <!-- Верхняя панель + навигация по датам -->
@@ -2563,6 +2563,11 @@
           <label>URL Google Apps Script</label>
           <input type="url" id="sScriptUrl" placeholder="https://script.google.com/…">
         </div>
+        <label class="checkbox-row" style="margin-top:12px">
+          <input type="checkbox" id="sImportGcal">
+          <span>Импорт Google Календаря (−30…+90 дн.)</span>
+        </label>
+        <p class="settings-hint">Односторонне: встречи основного календаря корп. аккаунта, от которого развёрнут Apps Script. После смены Code.gs — новая версия веб-приложения.</p>
         <button class="btn btn-primary" id="btnForceSync" style="width:100%;margin-top:8px">Принудительная синхронизация</button>
       </div>
 
@@ -2657,7 +2662,7 @@ const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
 const APP_VER_MAJOR = 1;
 const APP_VER_MINOR = 1;
 const APP_BUILD_DATE = '2026-07-29';
-const APP_BUILD_ITER = 7;
+const APP_BUILD_ITER = 9;
 
 function getAppVersionString() {
   return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
@@ -2677,8 +2682,10 @@ const DEFAULT_SETTINGS = {
   timezone: 'Europe/Moscow',
   scriptUrl: SCRIPT_URL,
   theme: 'light',
+  importGoogleCalendar: false,
   eventTypes: [
     { name: 'Прочее', color: '#e8e0ff' },
+    { name: 'Календарь', color: '#c7d2fe' },
     { name: 'Спорт', color: '#d9f8e5' },
     { name: 'Работа', color: '#ebe4ff' },
     { name: 'Личное', color: '#d9f4fb' },
@@ -2835,6 +2842,7 @@ const state = {
   typeEditIndex: -1,
   conflictResolve: null,
   initialSyncDone: false,
+  lastSyncAt: 0,
   dataLoaded: false,
   draftRepeatRule: null,
   prevRepeatType: 'none',
@@ -3157,7 +3165,10 @@ function getScriptUrl() {
 async function fetchRemote() {
   const url = getScriptUrl();
   if (!url) return null;
-  const resp = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now(), {
+  const sep = url.includes('?') ? '&' : '?';
+  let q = 't=' + Date.now();
+  if (state.settings && state.settings.importGoogleCalendar) q += '&calendar=1';
+  const resp = await fetch(url + sep + q, {
     method: 'GET',
     redirect: 'follow'
   });
@@ -3166,10 +3177,19 @@ async function fetchRemote() {
   if (data && typeof data === 'object' && data.success === false) {
     throw new Error(data.error || 'Ошибка сервера');
   }
-  if (!Array.isArray(data)) {
-    throw new Error('Некорректный ответ сервера');
+  // Новый формат { events, calendarIncluded } или старый массив
+  if (Array.isArray(data)) {
+    return { events: data, calendarIncluded: false, calendarError: null, calendarCount: 0 };
   }
-  return data;
+  if (data && Array.isArray(data.events)) {
+    return {
+      events: data.events,
+      calendarIncluded: !!data.calendarIncluded,
+      calendarError: data.calendarError || null,
+      calendarCount: data.calendarCount || 0
+    };
+  }
+  throw new Error('Некорректный ответ сервера');
 }
 
 async function pushQueue() {
@@ -3293,13 +3313,27 @@ function normalizeIncomingEvent(r) {
   return e;
 }
 
+function isGcalUid(uid) {
+  return !!uid && String(uid).indexOf('gcal_') === 0;
+}
+
+function ensureCalendarEventType() {
+  if (!state.settings.eventTypes) state.settings.eventTypes = [];
+  if (!state.settings.eventTypes.some(t => t.name === 'Календарь')) {
+    state.settings.eventTypes.splice(1, 0, { name: 'Календарь', color: '#c7d2fe' });
+    saveSettings();
+  }
+}
+
 /**
  * Слияние: локальные события не пропадают.
- * Сервер побеждает только если новее по времени И есть валидная дата.
+ * События Google Calendar (gcal_*): при calendarIncluded заменяются с сервера; иначе не трогаем.
  * @param {Array} remoteRows
- * @param {Set<string>} [justPushedUids] uid из очереди ДО push (очередь уже может быть пуста)
+ * @param {Set<string>} [justPushedUids]
+ * @param {{ calendarIncluded?: boolean }} [opts]
  */
-async function mergeRemote(remoteRows, justPushedUids) {
+async function mergeRemote(remoteRows, justPushedUids, opts) {
+  const calendarIncluded = !!(opts && opts.calendarIncluded);
   const localSnapshot = state.events.map(e => Object.assign({}, e));
   const localMap = {};
   localSnapshot.forEach(e => {
@@ -3323,6 +3357,17 @@ async function mergeRemote(remoteRows, justPushedUids) {
   for (const id of allUids) {
     const loc = localMap[id];
     let rem = remoteMap[id];
+
+    // Google Calendar — зеркало: только при успешном импорте в этом sync
+    if (isGcalUid(id)) {
+      if (calendarIncluded) {
+        if (rem) merged.push(rem);
+        // нет в remote → встреча удалена из календаря, не оставляем
+      } else if (loc) {
+        merged.push(loc);
+      }
+      continue;
+    }
 
     // Починка сдвига даты ±1 день
     if (loc && rem && isValidYmd(loc.event_date) && isValidYmd(rem.event_date) &&
@@ -3397,12 +3442,14 @@ async function mergeRemote(remoteRows, justPushedUids) {
   }
 
   // Страховка: активные локальные события не должны исчезнуть после merge
+  // (кроме gcal_* при успешном импорте календаря)
   const byUid = {};
   merged.forEach(e => { if (e && e.uid) byUid[String(e.uid)] = e; });
   localSnapshot.forEach(ev => {
     if (!ev || !ev.uid) return;
     if (ev.is_deleted === true || ev.is_deleted === 'TRUE') return;
     const id = String(ev.uid);
+    if (calendarIncluded && isGcalUid(id)) return;
     const cur = byUid[id];
     if (!cur) {
       byUid[id] = ev;
@@ -3473,12 +3520,16 @@ async function sync(force) {
       await pushQueue();
     }
     const remote = await fetchRemote();
-    if (remote) {
-      await mergeRemote(remote, justPushed);
+    if (remote && remote.events) {
+      if (state.settings.importGoogleCalendar) ensureCalendarEventType();
+      await mergeRemote(remote.events, justPushed, {
+        calendarIncluded: !!remote.calendarIncluded
+      });
       repairBrokenEventDates();
       state.dataLoaded = true;
       state.initialSyncDone = true;
     }
+    state.lastSyncAt = Date.now();
     state.syncStatus = 'online';
     updateSyncUI();
     // Если на текущем дне пусто, а события есть — перейти к ближайшей дате с ними
@@ -3490,14 +3541,21 @@ async function sync(force) {
     render();
     updateOfflineStub();
     if (force) {
-      const lines = activeEvents().slice(0, 5).map(e =>
-        (e.exerciseName || '?') + ' @ ' + (normalizeEventDate(e.event_date) || 'нет даты')
-      );
-      showToast(
-        'Синк · ' + activeEvents().length + ' соб.' +
-        (lines.length ? ' · ' + lines.join('; ') : ''),
-        activeEvents().some(e => !isValidYmd(normalizeEventDate(e.event_date)))
-      );
+      if (remote && remote.calendarError) {
+        showToast('Календарь: ' + remote.calendarError, true);
+      } else {
+        const lines = activeEvents().slice(0, 5).map(e =>
+          (e.exerciseName || '?') + ' @ ' + (normalizeEventDate(e.event_date) || 'нет даты')
+        );
+        let msg = 'Синк · ' + activeEvents().length + ' соб.';
+        if (remote && remote.calendarIncluded) {
+          msg += ' · календ. ' + (remote.calendarCount || 0);
+        }
+        showToast(
+          msg + (lines.length ? ' · ' + lines.join('; ') : ''),
+          activeEvents().some(e => !isValidYmd(normalizeEventDate(e.event_date)))
+        );
+      }
     }
   } catch (err) {
     console.error('Sync error:', err);
@@ -3508,7 +3566,19 @@ async function sync(force) {
   }
 }
 
+/** Синк при открытии / возврате в приложение (с троттлингом) */
+const SYNC_ON_OPEN_MIN_MS = 45000;
+
+function syncOnAppOpen(reason) {
+  if (!navigator.onLine || !getScriptUrl()) return;
+  if (state.syncStatus === 'syncing') return;
+  const last = state.lastSyncAt || 0;
+  if (Date.now() - last < SYNC_ON_OPEN_MIN_MS) return;
+  sync();
+}
+
 function enqueue(cmd) {
+  if (cmd && isGcalUid(cmd.uid)) return; // зеркало календаря — не в Sheets
   cmd.last_modified = cmd.last_modified || nowTs();
   // Убираем предыдущие команды для того же uid при add/update/delete
   if (cmd.action === 'delete') {
@@ -5267,6 +5337,7 @@ function openSettings() {
   document.getElementById('sDayEnd').dataset.raw = s.dayEnd || '24:00';
   document.getElementById('sScriptUrl').value =
     (s.scriptUrl && s.scriptUrl !== 'СЮДА_ВСТАВИТЬ_URL') ? s.scriptUrl : '';
+  document.getElementById('sImportGcal').checked = !!s.importGoogleCalendar;
   renderEventTypes();
   const dataSec = document.getElementById('settingsDataSection');
   const dataBtn = document.getElementById('btnToggleDataSection');
@@ -5394,11 +5465,16 @@ function saveSettingsForm() {
   state.settings.dayEnd = dayEnd;
   const url = document.getElementById('sScriptUrl').value.trim();
   state.settings.scriptUrl = url || SCRIPT_URL;
+  state.settings.importGoogleCalendar = !!document.getElementById('sImportGcal').checked;
+  if (state.settings.importGoogleCalendar) ensureCalendarEventType();
   saveSettings();
   applyTheme();
   closeSettings();
   render();
   showToast('Настройки сохранены');
+  if (state.settings.importGoogleCalendar && navigator.onLine && getScriptUrl()) {
+    sync(true);
+  }
 }
 
 /* ─── Импорт / экспорт ─── */
@@ -5829,7 +5905,7 @@ window.addEventListener('online', () => {
   state.syncStatus = 'online';
   updateSyncUI();
   updateOfflineStub();
-  sync();
+  syncOnAppOpen('online');
 });
 window.addEventListener('offline', () => {
   state.syncStatus = 'offline';
@@ -5837,12 +5913,23 @@ window.addEventListener('offline', () => {
   updateOfflineStub();
 });
 
+/* Синк при возврате в приложение (PWA / вкладка) */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') syncOnAppOpen('visible');
+});
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) syncOnAppOpen('pageshow');
+});
+window.addEventListener('focus', () => {
+  syncOnAppOpen('focus');
+});
+
 /* ─── Периодическая синхронизация ─── */
 setInterval(() => {
-  if (navigator.onLine && state.queue.length > 0) {
-    sync();
+  if (navigator.onLine && (state.queue.length > 0 || state.settings && state.settings.importGoogleCalendar)) {
+    syncOnAppOpen('interval');
   }
-}, 30000);
+}, 60000);
 
 /* ─── Запуск ─── */
 function init() {
@@ -5867,6 +5954,7 @@ function init() {
     if (!getScriptUrl()) {
       showToast('На ПК нет URL синхронизации — откройте Настройки и вставьте тот же URL, что на телефоне', true);
     } else {
+      // Холодный старт — всегда синкаем
       sync();
     }
   } else {
@@ -5874,7 +5962,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=27').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=29').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
