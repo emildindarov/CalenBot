@@ -1,5 +1,5 @@
 /* CalenBot — service worker (network-first для HTML/JS) */
-const CACHE = 'calenbot-v11';
+const CACHE = 'calenbot-v12';
 const ASSETS = [
   './',
   './index.html',

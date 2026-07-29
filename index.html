@@ -2788,7 +2788,10 @@ function nearestEventDate(fromDateStr) {
   const from = normalizeEventDate(fromDateStr) || toDateStr(new Date());
   const dates = [...new Set(
     activeEvents().map(e => normalizeEventDate(e.event_date)).filter(isValidYmd)
-  )].sort();
+  )].filter(ds => {
+    const y = +ds.slice(0, 4);
+    return y >= 1990 && y <= 2100;
+  }).sort();
   if (!dates.length) return null;
   if (dates.indexOf(from) >= 0) return from;
   let best = dates[0];
@@ -2801,6 +2804,42 @@ function nearestEventDate(fromDateStr) {
     }
   });
   return best;
+}
+
+/** Починить события с годом 2001 и др. мусором после кривого парсинга */
+function repairBrokenEventDates() {
+  let fixed = 0;
+  const todayY = new Date().getFullYear();
+  state.events.forEach(e => {
+    if (!e) return;
+    const raw = e.event_date;
+    const norm = normalizeEventDate(raw);
+    if (norm && norm !== raw) {
+      e.event_date = norm;
+      fixed++;
+      return;
+    }
+    const y = norm ? +norm.slice(0, 4) : NaN;
+    // Год 2001 — частый артефакт new Date('Jul 29') без года
+    if (!norm || y === 2001 || y < 1990 || y > 2100) {
+      // не угадываем дату — сбрасываем, чтобы не прыгать в 2001
+      if (e.event_date && String(e.event_date).indexOf('2001') >= 0) {
+        e.event_date = '';
+        fixed++;
+      } else if (norm && (y === 2001 || y < 1990)) {
+        e.event_date = '';
+        fixed++;
+      }
+    }
+  });
+  if (fixed) saveEvents();
+  // Курсор в мусорном годе — вернуть на сегодня
+  if (state.cursor && (state.cursor.getFullYear() < 1990 ||
+      state.cursor.getFullYear() === 2001 && todayY !== 2001 ||
+      state.cursor.getFullYear() > 2100)) {
+    state.cursor = new Date();
+  }
+  return fixed;
 }
 
 function timedEvents(list) {
@@ -2887,37 +2926,56 @@ function normalizeEventDate(v) {
   if (typeof v === 'number' && isFinite(v) && v > 20000 && v < 120000) {
     const epoch = Date.UTC(1899, 11, 30);
     const d = new Date(epoch + Math.round(v) * 86400000);
-    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+    const y = d.getUTCFullYear();
+    if (y < 1990 || y > 2100) return '';
+    return y + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
   }
   if (typeof v === 'string') {
     let s = v.replace(/^'/, '').replace(/\u00a0/g, ' ').trim();
     if (/^\d{5,6}([.,]\d+)?$/.test(s)) {
       return normalizeEventDate(parseFloat(s.replace(',', '.')));
     }
-    // Дата-only в UTC-полночь: не сдвигать через local Date
+    // Строго YYYY-MM-DD
     const dateOnly = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (dateOnly) return dateOnly[1] + '-' + dateOnly[2] + '-' + dateOnly[3];
-    // ISO на UTC-полночь = дата без времени (берём YYYY-MM-DD из строки)
+    if (dateOnly) {
+      const y = +dateOnly[1];
+      if (y < 1990 || y > 2100) return '';
+      return dateOnly[1] + '-' + dateOnly[2] + '-' + dateOnly[3];
+    }
+    // ISO на UTC-полночь = дата без времени
     if (/^\d{4}-\d{2}-\d{2}T00:00:00(\.\d+)?(Z|[+-]00:00)?$/i.test(s)) {
+      const y = +s.slice(0, 4);
+      if (y < 1990 || y > 2100) return '';
       return s.slice(0, 10);
     }
-    // Полный ISO — календарный день в локали устройства
+    // Полный ISO с временем — локальный календарный день
     if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
       const d = new Date(s);
-      if (!isNaN(d.getTime())) return toDateStr(d);
+      if (!isNaN(d.getTime())) {
+        const out = toDateStr(d);
+        const y = +out.slice(0, 4);
+        if (y < 1990 || y > 2100) return '';
+        return out;
+      }
+      return '';
     }
-    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (m) return m[1];
-    const dm = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
-    if (dm) return dm[3] + '-' + pad(+dm[2]) + '-' + pad(+dm[1]);
-    const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (slash) return slash[3] + '-' + pad(+slash[2]) + '-' + pad(+slash[1]);
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) return toDateStr(d);
-    return s;
+    // 29.07.2026 или 29/07/2026
+    const dm = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+    if (dm) {
+      const y = +dm[3];
+      if (y < 1990 || y > 2100) return '';
+      return dm[3] + '-' + pad(+dm[2]) + '-' + pad(+dm[1]);
+    }
+    // Не вызываем new Date('Jul 29') — в JS это даёт 2001 год!
+    return '';
   }
-  if (v instanceof Date && !isNaN(v.getTime())) return toDateStr(v);
-  return String(v).trim();
+  if (v instanceof Date && !isNaN(v.getTime())) {
+    const out = toDateStr(v);
+    const y = +out.slice(0, 4);
+    if (y < 1990 || y > 2100) return '';
+    return out;
+  }
+  return '';
 }
 
 function normalizeTimeStr(v) {
@@ -3146,6 +3204,7 @@ async function sync(force) {
     const remote = await fetchRemote();
     if (remote) {
       await mergeRemote(remote, justPushed);
+      repairBrokenEventDates();
       state.dataLoaded = true;
       state.initialSyncDone = true;
     }
@@ -3153,8 +3212,9 @@ async function sync(force) {
     updateSyncUI();
     // Если на текущем дне пусто, а события есть — перейти к ближайшей дате с ними
     if (activeEvents().length && !eventsForDate(toDateStr(state.cursor)).length) {
-      const jump = nearestEventDate(toDateStr(state.cursor));
+      const jump = nearestEventDate(toDateStr(new Date()));
       if (jump) state.cursor = parseDate(jump);
+      else state.cursor = new Date();
     }
     render();
     updateOfflineStub();
@@ -5176,6 +5236,7 @@ setInterval(() => {
 /* ─── Запуск ─── */
 function init() {
   loadStore();
+  repairBrokenEventDates();
   state.cursor = new Date();
   state.view = 'home';
   state.syncStatus = navigator.onLine ? 'online' : 'offline';
@@ -5198,7 +5259,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=11').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=12').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
