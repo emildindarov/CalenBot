@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!-- CalenBot v1.1.16 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
+<!-- CalenBot v1.1.18 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -549,6 +549,7 @@
       position: relative;
     }
     .date-nav .today-cal-btn .cal-check { display: none; }
+    .date-nav .today-cal-btn.is-today .cal-check { display: block; }
     .date-nav .today-cal-btn .cal-week-num { display: none; }
     .date-nav .today-cal-btn.is-past { color: #94a3b8; }
     .date-nav .today-cal-btn.is-today {
@@ -2283,7 +2284,7 @@
 
   <div class="app-splash" id="appSplash" aria-hidden="false">
     <img src="icon-512.png" alt="CalenBot" width="384" height="384">
-    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.16</div>
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.18</div>
   </div>
 
   <!-- Верхняя панель + навигация по датам -->
@@ -2689,7 +2690,7 @@ const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
 const APP_VER_MAJOR = 1;
 const APP_VER_MINOR = 1;
 const APP_BUILD_DATE = '2026-07-30';
-const APP_BUILD_ITER = 16;
+const APP_BUILD_ITER = 18;
 
 function getAppVersionString() {
   return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
@@ -4162,6 +4163,35 @@ function renderDateNav() {
         btn.classList.add('is-future');
         btn.title = 'К сегодняшнему дню · ' + wd;
       }
+    } else if (state.view === 'month') {
+      if (weekNumEl) weekNumEl.textContent = '';
+      btn.setAttribute('aria-label', 'К текущему месяцу');
+      const sameMonth = cur.getFullYear() === today.getFullYear() &&
+        cur.getMonth() === today.getMonth();
+      if (sameMonth) {
+        btn.classList.add('is-today');
+        btn.title = 'Текущий месяц';
+      } else if (cur.getFullYear() < today.getFullYear() ||
+        (cur.getFullYear() === today.getFullYear() && cur.getMonth() < today.getMonth())) {
+        btn.classList.add('is-past');
+        btn.title = 'К текущему месяцу';
+      } else {
+        btn.classList.add('is-future');
+        btn.title = 'К текущему месяцу';
+      }
+    } else if (state.view === 'year') {
+      if (weekNumEl) weekNumEl.textContent = '';
+      btn.setAttribute('aria-label', 'К текущему году');
+      if (cur.getFullYear() === today.getFullYear()) {
+        btn.classList.add('is-today');
+        btn.title = 'Текущий год';
+      } else if (cur.getFullYear() < today.getFullYear()) {
+        btn.classList.add('is-past');
+        btn.title = 'К текущему году';
+      } else {
+        btn.classList.add('is-future');
+        btn.title = 'К текущему году';
+      }
     } else {
       if (weekNumEl) weekNumEl.textContent = '';
       btn.setAttribute('aria-label', 'Сегодня');
@@ -4290,6 +4320,7 @@ function animateHomeSwipe(dayStep) {
 
 function swipeTargetId(view) {
   if (view === 'home') return 'homeView';
+  if (view === 'year') return 'yearGrid';
   if (view === 'month') return 'monthGrid';
   if (view === 'week') return 'weekGrid';
   if (view === 'day') return 'dayViewInner';
@@ -4303,6 +4334,8 @@ function stepCursorForSwipe(view, dir) {
     state.cursor = addDays(state.cursor, dir * 7);
   } else if (view === 'month') {
     state.cursor = new Date(state.cursor.getFullYear(), state.cursor.getMonth() + dir, 1);
+  } else if (view === 'year') {
+    state.cursor = new Date(state.cursor.getFullYear() + dir, 0, 1);
   }
 }
 
@@ -4347,6 +4380,7 @@ function bindHomeSwipe() {
 function bindCalendarSwipes() {
   const targets = [
     { id: 'homeView', views: ['home'] },
+    { id: 'yearGrid', views: ['year'] },
     { id: 'monthGrid', views: ['month'] },
     { id: 'weekGrid', views: ['week'] },
     { id: 'dayViewInner', views: ['day'] }
@@ -6096,7 +6130,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=36').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=38').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
