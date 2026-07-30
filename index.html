@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!-- CalenBot v1.1.18 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
+<!-- CalenBot v1.1.20 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -1818,6 +1818,18 @@
       cursor: pointer;
     }
 
+    .checkbox-row-pair {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 18px;
+      padding: 4px 0 8px;
+    }
+    .checkbox-row-pair .checkbox-row {
+      padding: 6px 0;
+      margin: 0;
+    }
+
     .checkbox-row input[type="checkbox"],
     .radio-row input[type="radio"] {
       width: 20px;
@@ -1827,6 +1839,108 @@
     }
 
     .checkbox-row span, .radio-row span { font-size: 14px; }
+
+    .form-collapse {
+      margin-bottom: 10px;
+      border-radius: 14px;
+      background: var(--glass);
+      border: 1px solid rgba(255,255,255,0.45);
+      overflow: hidden;
+    }
+    .form-collapse-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 10px;
+      padding: 10px 12px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font: inherit;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      box-shadow: none;
+    }
+    .form-collapse-btn .collapse-chevron {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      stroke: var(--text-muted);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform 0.2s ease;
+      transform: rotate(-90deg);
+    }
+    .form-collapse.open .form-collapse-btn .collapse-chevron {
+      transform: rotate(0deg);
+    }
+    .form-collapse-body {
+      display: none;
+      padding: 0 12px 12px;
+    }
+    .form-collapse.open .form-collapse-body {
+      display: block;
+    }
+    .form-collapse .form-group {
+      margin-bottom: 0;
+    }
+    .form-collapse .form-group > label { display: none; }
+
+    .edit-tasks-block {
+      display: none;
+      margin: 0 0 14px;
+      padding: 8px 0 4px;
+    }
+    .edit-tasks-block.visible { display: block; }
+    .edit-task-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .edit-task-num {
+      flex-shrink: 0;
+      width: 1.4em;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-align: right;
+    }
+    .edit-task-row input[type="text"] {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+    }
+    .edit-task-btn {
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.5);
+      background: var(--glass-strong);
+      box-shadow: var(--shadow-out-sm);
+      color: var(--text);
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .edit-task-btn:active { box-shadow: var(--shadow-in-sm); }
+    .edit-task-btn.remove {
+      color: #b91c1c;
+      font-size: 16px;
+      font-weight: 600;
+    }
 
     .radio-row {
       display: flex;
@@ -1860,6 +1974,93 @@
 
     .detail-field .value {
       font-size: 15px;
+    }
+
+    .detail-tasks {
+      margin-bottom: 12px;
+      border-radius: 14px;
+      background: var(--glass);
+      border: 1px solid rgba(255,255,255,0.45);
+      overflow: hidden;
+    }
+    .detail-tasks-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 10px;
+      padding: 10px 12px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font: inherit;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      box-shadow: none;
+      text-align: left;
+    }
+    .detail-tasks-btn .detail-tasks-meta {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: none;
+      letter-spacing: 0;
+      margin-left: auto;
+      margin-right: 4px;
+    }
+    .detail-tasks-btn .collapse-chevron {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      stroke: var(--text-muted);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform 0.2s ease;
+      transform: rotate(-90deg);
+    }
+    .detail-tasks.open .detail-tasks-btn .collapse-chevron {
+      transform: rotate(0deg);
+    }
+    .detail-tasks-body {
+      display: none;
+      padding: 0 10px 10px;
+    }
+    .detail-tasks.open .detail-tasks-body {
+      display: block;
+    }
+    .detail-task-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 4px;
+      cursor: pointer;
+      border-radius: 10px;
+    }
+    .detail-task-row:active {
+      background: var(--accent-soft);
+    }
+    .detail-task-row input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      margin-top: 1px;
+      accent-color: var(--accent);
+      flex-shrink: 0;
+    }
+    .detail-task-row .detail-task-text {
+      font-size: 15px;
+      line-height: 1.35;
+      color: var(--text);
+      flex: 1;
+      min-width: 0;
+    }
+    .detail-task-row.is-done .detail-task-text {
+      text-decoration: line-through;
+      opacity: 0.65;
     }
 
     .detail-actions {
@@ -2284,7 +2485,7 @@
 
   <div class="app-splash" id="appSplash" aria-hidden="false">
     <img src="icon-512.png" alt="CalenBot" width="384" height="384">
-    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.18</div>
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.20</div>
   </div>
 
   <!-- Верхняя панель + навигация по датам -->
@@ -2420,17 +2621,42 @@
           <input type="time" id="fTimeEnd">
         </div>
       </div>
-      <label class="checkbox-row">
-        <input type="checkbox" id="fAllDay">
-        <span>Без времени (весь день)</span>
-      </label>
-      <div class="form-group">
-        <label>Место</label>
-        <input type="text" id="fLocation" placeholder="Адрес или место">
+      <div class="checkbox-row-pair">
+        <label class="checkbox-row">
+          <input type="checkbox" id="fHasTasks">
+          <span>Задачи</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="fAllDay">
+          <span>Без времени (весь день)</span>
+        </label>
       </div>
-      <div class="form-group">
-        <label>Описание</label>
-        <textarea id="fComment" rows="3" placeholder="Комментарий…"></textarea>
+      <div class="edit-tasks-block" id="editTasksBlock" hidden>
+        <div id="editTasksList"></div>
+      </div>
+      <div class="form-collapse" id="collapseLocation">
+        <button type="button" class="form-collapse-btn" id="btnCollapseLocation" aria-expanded="false">
+          <span>Место</span>
+          <svg class="collapse-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="form-collapse-body">
+          <div class="form-group">
+            <label>Место</label>
+            <input type="text" id="fLocation" placeholder="Адрес или место">
+          </div>
+        </div>
+      </div>
+      <div class="form-collapse" id="collapseComment">
+        <button type="button" class="form-collapse-btn" id="btnCollapseComment" aria-expanded="false">
+          <span>Описание</span>
+          <svg class="collapse-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="form-collapse-body">
+          <div class="form-group">
+            <label>Описание</label>
+            <textarea id="fComment" rows="3" placeholder="Комментарий…"></textarea>
+          </div>
+        </div>
       </div>
       <div class="form-group">
         <label>Повторение</label>
@@ -2690,7 +2916,7 @@ const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
 const APP_VER_MAJOR = 1;
 const APP_VER_MINOR = 1;
 const APP_BUILD_DATE = '2026-07-30';
-const APP_BUILD_ITER = 18;
+const APP_BUILD_ITER = 20;
 
 function getAppVersionString() {
   return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
@@ -3685,6 +3911,7 @@ function addEvent(data) {
     is_all_day: false,
     repeat_type: 'none',
     repeat_rule: null,
+    checklist: [],
     series_id: null,
     series_role: null,
     last_modified: nowTs(),
@@ -3905,6 +4132,7 @@ function saveRepeatingEvent(editingUid, data) {
       comment: isMaster && summary
         ? ('Повтор: ' + summary + (baseComment ? '\n' + baseComment : ''))
         : baseComment,
+      checklist: data.checklist || [],
       is_all_day: data.is_all_day,
       series_id: seriesId,
       series_role: isMaster ? 'master' : 'occurrence',
@@ -3933,51 +4161,105 @@ function saveRepeatingEvent(editingUid, data) {
   return dates.length;
 }
 
-/** Упаковка repeat_rule / серии в instruction для синхронизации с таблицей */
+/** Упаковка repeat_rule / серии / задач в instruction для синхронизации с таблицей */
+function peelInstructionMeta_(raw) {
+  let rest = raw || '';
+  let occ = null;
+  let rr = null;
+  let tasks = null;
+  let guard = 0;
+  while (guard++ < 12) {
+    if (rest.indexOf('__OCC__') === 0) {
+      const nl = rest.indexOf('\n');
+      occ = (nl >= 0 ? rest.slice(6, nl) : rest.slice(6)).trim();
+      rest = nl >= 0 ? rest.slice(nl + 1) : '';
+      continue;
+    }
+    if (rest.indexOf('__RR__') === 0) {
+      const nl = rest.indexOf('\n');
+      rr = nl >= 0 ? rest.slice(5, nl) : rest.slice(5);
+      rest = nl >= 0 ? rest.slice(nl + 1) : '';
+      continue;
+    }
+    if (rest.indexOf('__TASKS__') === 0) {
+      const nl = rest.indexOf('\n');
+      tasks = nl >= 0 ? rest.slice(8, nl) : rest.slice(8);
+      rest = nl >= 0 ? rest.slice(nl + 1) : '';
+      continue;
+    }
+    break;
+  }
+  return { rest: rest, occ: occ, rr: rr, tasks: tasks };
+}
+
+function normalizeChecklist_(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(item => {
+    if (typeof item === 'string') return { text: item, done: false };
+    return {
+      text: String((item && (item.text != null ? item.text : item.t)) || ''),
+      done: !!(item && (item.done || item.d))
+    };
+  }).filter(t => t.text.trim());
+}
+
 function packRepeatRule(ev) {
   if (!ev) return;
-  let base = ev.instruction || '';
-  if (base.indexOf('__RR__') === 0 || base.indexOf('__OCC__') === 0) {
-    const nl = base.indexOf('\n');
-    base = nl >= 0 ? base.slice(nl + 1) : '';
+  const peeled = peelInstructionMeta_(ev.instruction || '');
+  let base = peeled.rest;
+  if (Array.isArray(ev.checklist)) {
+    // checklist уже на объекте — instruction-хвост без мета
+  } else if (peeled.tasks) {
+    try {
+      ev.checklist = normalizeChecklist_(JSON.parse(peeled.tasks));
+    } catch (e) {
+      ev.checklist = [];
+    }
   }
+
+  let head = '';
   if (ev.series_role === 'occurrence' && ev.series_id) {
-    ev.instruction = '__OCC__' + ev.series_id + (base ? '\n' + base : '');
+    head = '__OCC__' + ev.series_id;
     ev.repeat_type = 'none';
     ev.repeat_rule = null;
-    return;
-  }
-  if (ev.repeat_type && ev.repeat_type !== 'none' && ev.repeat_rule) {
+  } else if (ev.repeat_type && ev.repeat_type !== 'none' && ev.repeat_rule) {
     const rule = Object.assign({}, ev.repeat_rule);
     if (ev.series_id) rule.series_id = ev.series_id;
-    ev.instruction = '__RR__' + JSON.stringify(rule) + (base ? '\n' + base : '');
+    head = '__RR__' + JSON.stringify(rule);
     if (ev.repeat_type !== 'custom') ev.repeat_type = 'custom';
   } else if (ev.series_id && ev.series_role === 'master') {
-    ev.instruction = '__RR__' + JSON.stringify({ series_id: ev.series_id }) + (base ? '\n' + base : '');
+    head = '__RR__' + JSON.stringify({ series_id: ev.series_id });
   } else {
-    ev.instruction = base;
     if (ev.repeat_type !== 'custom') ev.repeat_rule = null;
   }
+
+  const tasks = normalizeChecklist_(ev.checklist);
+  ev.checklist = tasks;
+  const tasksLine = tasks.length ? ('__TASKS__' + JSON.stringify(tasks.map(t => ({
+    t: t.text,
+    d: !!t.done
+  })))) : '';
+
+  const parts = [];
+  if (head) parts.push(head);
+  if (tasksLine) parts.push(tasksLine);
+  if (base) parts.push(base);
+  ev.instruction = parts.join('\n');
 }
 
 function unpackRepeatRule(ev) {
   if (!ev) return;
-  const raw = ev.instruction || '';
-  if (raw.indexOf('__OCC__') === 0) {
-    const nl = raw.indexOf('\n');
-    ev.series_id = (nl >= 0 ? raw.slice(6, nl) : raw.slice(6)).trim();
+  const peeled = peelInstructionMeta_(ev.instruction || '');
+  ev.instruction = peeled.rest;
+
+  if (peeled.occ) {
+    ev.series_id = peeled.occ;
     ev.series_role = 'occurrence';
-    ev.instruction = nl >= 0 ? raw.slice(nl + 1) : '';
     ev.repeat_type = 'none';
     ev.repeat_rule = null;
-    return;
-  }
-  if (raw.indexOf('__RR__') === 0) {
-    const nl = raw.indexOf('\n');
-    const jsonPart = nl >= 0 ? raw.slice(5, nl) : raw.slice(5);
-    const rest = nl >= 0 ? raw.slice(nl + 1) : '';
+  } else if (peeled.rr) {
     try {
-      ev.repeat_rule = JSON.parse(jsonPart);
+      ev.repeat_rule = JSON.parse(peeled.rr);
       if (ev.repeat_type === 'custom' || !ev.repeat_type || ev.repeat_type === 'none') {
         ev.repeat_type = 'custom';
       }
@@ -3988,9 +4270,18 @@ function unpackRepeatRule(ev) {
     } catch (e) {
       ev.repeat_rule = null;
     }
-    ev.instruction = rest;
   } else if (typeof ev.repeat_rule === 'string') {
     try { ev.repeat_rule = JSON.parse(ev.repeat_rule); } catch (e) { ev.repeat_rule = null; }
+  }
+
+  if (peeled.tasks) {
+    try {
+      ev.checklist = normalizeChecklist_(JSON.parse(peeled.tasks));
+    } catch (e) {
+      ev.checklist = Array.isArray(ev.checklist) ? normalizeChecklist_(ev.checklist) : [];
+    }
+  } else if (!Array.isArray(ev.checklist)) {
+    ev.checklist = [];
   }
 }
 
@@ -5182,6 +5473,82 @@ function updateColorPreview() {
   document.getElementById('fColorPreview').style.background = type ? type.color : '#e8e0ff';
 }
 
+function setFormCollapse(id, open) {
+  const box = document.getElementById(id);
+  const btn = box && box.querySelector('.form-collapse-btn');
+  if (!box || !btn) return;
+  box.classList.toggle('open', !!open);
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function collectEditChecklist() {
+  const has = document.getElementById('fHasTasks').checked;
+  if (!has) return [];
+  const rows = document.querySelectorAll('#editTasksList .edit-task-row input[type="text"]');
+  const list = [];
+  rows.forEach(inp => {
+    const text = (inp.value || '').trim();
+    if (text) list.push({ text: text, done: inp.dataset.done === '1' });
+  });
+  return list;
+}
+
+function renderEditTasksList(items) {
+  const list = document.getElementById('editTasksList');
+  if (!list) return;
+  const arr = (items && items.length) ? items.slice() : [{ text: '' }];
+  list.innerHTML = '';
+  arr.forEach((item, i) => {
+    const text = typeof item === 'string' ? item : (item.text || '');
+    const done = !!(item && item.done);
+    const row = document.createElement('div');
+    row.className = 'edit-task-row';
+    row.dataset.idx = String(i);
+
+    const num = document.createElement('span');
+    num.className = 'edit-task-num';
+    num.textContent = String(i + 1);
+
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.placeholder = 'Текст задачи';
+    inp.maxLength = 200;
+    inp.value = text;
+    inp.dataset.done = done ? '1' : '0';
+
+    const btnRm = document.createElement('button');
+    btnRm.type = 'button';
+    btnRm.className = 'edit-task-btn remove';
+    btnRm.title = 'Удалить';
+    btnRm.setAttribute('aria-label', 'Удалить');
+    btnRm.textContent = '×';
+
+    const btnAdd = document.createElement('button');
+    btnAdd.type = 'button';
+    btnAdd.className = 'edit-task-btn add';
+    btnAdd.title = 'Добавить';
+    btnAdd.setAttribute('aria-label', 'Добавить');
+    btnAdd.textContent = '+';
+
+    row.appendChild(num);
+    row.appendChild(inp);
+    row.appendChild(btnRm);
+    row.appendChild(btnAdd);
+    list.appendChild(row);
+  });
+}
+
+function syncEditTasksVisibility() {
+  const on = document.getElementById('fHasTasks').checked;
+  const block = document.getElementById('editTasksBlock');
+  if (!block) return;
+  block.hidden = !on;
+  block.classList.toggle('visible', on);
+  if (on && !document.querySelector('#editTasksList .edit-task-row')) {
+    renderEditTasksList([{ text: '' }]);
+  }
+}
+
 function openEdit(eventUid, presets) {
   state.editingUid = eventUid || null;
   const modal = document.getElementById('modalEdit');
@@ -5201,7 +5568,8 @@ function openEdit(eventUid, presets) {
     location: '',
     comment: '',
     is_all_day: false,
-    repeat_type: 'none'
+    repeat_type: 'none',
+    checklist: []
   }, ev || {}, presets || {});
 
   fillTypeSelect(data.groupName || 'Прочее');
@@ -5220,6 +5588,15 @@ function openEdit(eventUid, presets) {
     : null;
   updateRepeatSummary();
   document.getElementById('fAllDay').checked = isAllDay(data) && !data.start_time;
+
+  const checklist = normalizeChecklist_(data.checklist);
+  const hasTasks = checklist.length > 0;
+  document.getElementById('fHasTasks').checked = hasTasks;
+  renderEditTasksList(hasTasks ? checklist : [{ text: '' }]);
+  syncEditTasksVisibility();
+
+  setFormCollapse('collapseLocation', !!(data.location && String(data.location).trim()));
+  setFormCollapse('collapseComment', !!(data.comment && String(data.comment).trim()));
 
   toggleAllDayFields();
   modal.classList.add('open');
@@ -5278,6 +5655,7 @@ function saveEdit() {
     end_time: allDay ? '' : normalizeTimeStr(document.getElementById('fTimeEnd').value || ''),
     location: document.getElementById('fLocation').value.trim(),
     comment: document.getElementById('fComment').value.trim(),
+    checklist: collectEditChecklist(),
     is_all_day: allDay || !document.getElementById('fTimeStart').value,
     repeat_type: repeatType,
     repeat_rule: repeatRule
@@ -5337,6 +5715,24 @@ function openDetail(eventUid) {
   if (ev.comment) {
     html += '<div class="detail-field"><div class="label">Описание</div><div class="value">' + esc(ev.comment) + '</div></div>';
   }
+  const cl = normalizeChecklist_(ev.checklist);
+  if (cl.length) {
+    const doneN = cl.filter(t => t.done).length;
+    html += '<div class="detail-tasks" id="detailTasks">';
+    html += '<button type="button" class="detail-tasks-btn" id="btnDetailTasks" aria-expanded="false">';
+    html += '<span>Задачи</span>';
+    html += '<span class="detail-tasks-meta" id="detailTasksMeta">' + doneN + '/' + cl.length + '</span>';
+    html += '<svg class="collapse-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+    html += '</button>';
+    html += '<div class="detail-tasks-body" id="detailTasksBody">';
+    cl.forEach((t, i) => {
+      html += '<label class="detail-task-row' + (t.done ? ' is-done' : '') + '">';
+      html += '<input type="checkbox" data-task-idx="' + i + '"' + (t.done ? ' checked' : '') + '>';
+      html += '<span class="detail-task-text">' + esc(t.text) + '</span>';
+      html += '</label>';
+    });
+    html += '</div></div>';
+  }
   if (ev.repeat_type && ev.repeat_type !== 'none') {
     const rt = {
       daily: 'Ежедневно',
@@ -5373,6 +5769,41 @@ function openDetail(eventUid) {
 
   body.innerHTML = html;
   document.getElementById('modalDetail').classList.add('open');
+
+  const btnTasks = document.getElementById('btnDetailTasks');
+  if (btnTasks) {
+    btnTasks.onclick = () => {
+      const box = document.getElementById('detailTasks');
+      if (!box) return;
+      const open = !box.classList.contains('open');
+      box.classList.toggle('open', open);
+      btnTasks.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+  }
+
+  body.querySelectorAll('input[data-task-idx]').forEach(cb => {
+    cb.onchange = function () {
+      const cur = state.events.find(e => e.uid === eventUid);
+      if (!cur) return;
+      const list = normalizeChecklist_(cur.checklist).map(t => ({
+        text: t.text,
+        done: !!t.done
+      }));
+      const idx = +this.dataset.taskIdx;
+      if (idx < 0 || idx >= list.length) return;
+      list[idx].done = !!this.checked;
+      updateEvent(eventUid, { checklist: list });
+      const row = this.closest('.detail-task-row');
+      if (row) row.classList.toggle('is-done', !!this.checked);
+      const meta = document.getElementById('detailTasksMeta');
+      if (meta) {
+        const doneN = list.filter(t => t.done).length;
+        meta.textContent = doneN + '/' + list.length;
+      }
+      render();
+      if (navigator.onLine) sync();
+    };
+  });
 
   document.getElementById('detailDone').onchange = function () {
     const status = this.checked ? 'done' : 'not_started';
@@ -5988,6 +6419,48 @@ document.getElementById('btnEditBack').onclick = closeEdit;
 document.getElementById('btnEditCancel').onclick = closeEdit;
 document.getElementById('btnEditSave').onclick = saveEdit;
 document.getElementById('fAllDay').onchange = toggleAllDayFields;
+document.getElementById('fHasTasks').onchange = () => {
+  if (document.getElementById('fHasTasks').checked) {
+    if (!document.querySelector('#editTasksList .edit-task-row')) {
+      renderEditTasksList([{ text: '' }]);
+    }
+  }
+  syncEditTasksVisibility();
+};
+document.getElementById('btnCollapseLocation').onclick = () => {
+  const box = document.getElementById('collapseLocation');
+  setFormCollapse('collapseLocation', !box.classList.contains('open'));
+};
+document.getElementById('btnCollapseComment').onclick = () => {
+  const box = document.getElementById('collapseComment');
+  setFormCollapse('collapseComment', !box.classList.contains('open'));
+};
+document.getElementById('editTasksList').addEventListener('click', e => {
+  const btn = e.target.closest('.edit-task-btn');
+  if (!btn) return;
+  const row = btn.closest('.edit-task-row');
+  if (!row) return;
+  const rows = Array.from(document.querySelectorAll('#editTasksList .edit-task-row'));
+  const values = rows.map(r => {
+    const inp = r.querySelector('input[type="text"]');
+    return { text: inp ? inp.value : '', done: inp && inp.dataset.done === '1' };
+  });
+  const idx = rows.indexOf(row);
+  if (btn.classList.contains('add')) {
+    values.splice(idx + 1, 0, { text: '', done: false });
+    renderEditTasksList(values);
+    const inputs = document.querySelectorAll('#editTasksList input[type="text"]');
+    const focusEl = inputs[idx + 1];
+    if (focusEl) focusEl.focus();
+  } else if (btn.classList.contains('remove')) {
+    if (values.length <= 1) {
+      values[0] = { text: '', done: false };
+    } else {
+      values.splice(idx, 1);
+    }
+    renderEditTasksList(values);
+  }
+});
 document.getElementById('fType').onchange = updateColorPreview;
 document.getElementById('fTimeStart').addEventListener('input', () => {
   if (document.getElementById('fTimeStart').value) {
@@ -6130,7 +6603,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=38').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=40').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
