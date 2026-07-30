@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!-- CalenBot v1.1.12 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
+<!-- CalenBot v1.1.16 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -626,13 +626,17 @@
       min-height: 0;
       text-transform: uppercase;
       touch-action: pan-y;
+    }
+
+    /* Свайп влево/вправо: Главная / Месяц / Неделя / День */
+    .swipe-pane {
       transition: transform 0.2s ease, opacity 0.2s ease;
       will-change: transform, opacity;
     }
-    .home-view.swipe-out-left { transform: translateX(-30px); opacity: 0; }
-    .home-view.swipe-out-right { transform: translateX(30px); opacity: 0; }
-    .home-view.swipe-in-left { transform: translateX(-30px); opacity: 0; }
-    .home-view.swipe-in-right { transform: translateX(30px); opacity: 0; }
+    .swipe-pane.swipe-out-left { transform: translateX(-30px); opacity: 0; }
+    .swipe-pane.swipe-out-right { transform: translateX(30px); opacity: 0; }
+    .swipe-pane.swipe-in-left { transform: translateX(-30px); opacity: 0; }
+    .swipe-pane.swipe-in-right { transform: translateX(30px); opacity: 0; }
 
     .home-today-label {
       font-size: 13px;
@@ -654,10 +658,14 @@
     .home-weekday {
       font-size: 18px;
       font-weight: 600;
-      color: var(--accent);
       margin-bottom: 28px;
       letter-spacing: 0.04em;
     }
+    .home-weekday.past { color: var(--text-muted); }
+    .home-weekday.today { color: #16a34a; }
+    .home-weekday.future { color: #2563eb; }
+    html[data-theme="dark"] .home-weekday.today { color: #4ade80; }
+    html[data-theme="dark"] .home-weekday.future { color: #60a5fa; }
 
     .home-section-title {
       font-size: 16px;
@@ -1016,6 +1024,7 @@
       background: transparent;
       gap: 3px;
       padding: 6px;
+      touch-action: pan-y;
     }
 
     .month-weekday {
@@ -1177,6 +1186,7 @@
       min-height: 0;
       overflow: hidden;
       background: var(--surface);
+      touch-action: pan-y;
     }
 
     .week-header-row,
@@ -2273,7 +2283,7 @@
 
   <div class="app-splash" id="appSplash" aria-hidden="false">
     <img src="icon-512.png" alt="CalenBot" width="384" height="384">
-    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.12</div>
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.16</div>
   </div>
 
   <!-- Верхняя панель + навигация по датам -->
@@ -2323,7 +2333,7 @@
 
     <!-- Вид «Главная» -->
     <div class="view active" id="viewHome">
-      <div class="home-view" id="homeView"></div>
+      <div class="home-view swipe-pane" id="homeView"></div>
     </div>
 
     <!-- Вид «Год» -->
@@ -2333,17 +2343,17 @@
 
     <!-- Вид «Месяц» -->
     <div class="view" id="viewMonth">
-      <div class="month-grid" id="monthGrid"></div>
+      <div class="month-grid swipe-pane" id="monthGrid"></div>
     </div>
 
     <!-- Вид «Неделя» -->
     <div class="view" id="viewWeek">
-      <div class="week-grid" id="weekGrid"></div>
+      <div class="week-grid swipe-pane" id="weekGrid"></div>
     </div>
 
     <!-- Вид «День» -->
     <div class="view" id="viewDay">
-      <div class="day-view-inner" id="dayViewInner"></div>
+      <div class="day-view-inner swipe-pane" id="dayViewInner"></div>
     </div>
 
     <!-- Результаты поиска -->
@@ -2678,8 +2688,8 @@ const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
  */
 const APP_VER_MAJOR = 1;
 const APP_VER_MINOR = 1;
-const APP_BUILD_DATE = '2026-07-29';
-const APP_BUILD_ITER = 12;
+const APP_BUILD_DATE = '2026-07-30';
+const APP_BUILD_ITER = 16;
 
 function getAppVersionString() {
   return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
@@ -3184,10 +3194,13 @@ async function fetchRemote() {
   if (!url) return null;
   const sep = url.includes('?') ? '&' : '?';
   let q = 't=' + Date.now();
+  // Всегда просим календарь, если галка включена (на случай потери query при редиректе
+  // сервер дополнительно смотрит IMPORT_GCAL)
   if (state.settings && state.settings.importGoogleCalendar) q += '&calendar=1';
   const resp = await fetch(url + sep + q, {
     method: 'GET',
-    redirect: 'follow'
+    redirect: 'follow',
+    cache: 'no-store'
   });
   if (!resp.ok) throw new Error('HTTP ' + resp.status);
   const data = await resp.json();
@@ -3206,11 +3219,14 @@ async function fetchRemote() {
     };
   }
   if (data && Array.isArray(data.events)) {
+    const gcalInPayload = data.events.some(e => e && String(e.uid || '').indexOf('gcal_') === 0);
     return {
       events: data.events,
-      calendarIncluded: !!data.calendarIncluded,
+      calendarIncluded: !!data.calendarIncluded || gcalInPayload,
       calendarError: data.calendarError || null,
-      calendarCount: data.calendarCount || 0,
+      calendarCount: data.calendarCount != null
+        ? data.calendarCount
+        : data.events.filter(e => e && String(e.uid || '').indexOf('gcal_') === 0).length,
       legacyArray: false,
       api: data.api || null
     };
@@ -4238,7 +4254,9 @@ function renderHome() {
   let html = '<div class="home-today-label">' + dayLabel + '</div>';
   html += '<div class="home-date">' + day.getDate() + ' ' + MONTHS_RU_GEN[day.getMonth()] +
     ' ' + day.getFullYear() + '</div>';
-  html += '<div class="home-weekday">' + WEEKDAYS_RU[day.getDay()] + '</div>';
+  html += '<div class="home-weekday ' +
+    (isToday ? 'today' : (past ? 'past' : 'future')) + '">' +
+    WEEKDAYS_RU[day.getDay()] + '</div>';
   html += '<div class="home-section-title">' + sectionTitle + '</div>';
   html += '<div class="home-types">';
 
@@ -4267,59 +4285,99 @@ function renderHome() {
 }
 
 function animateHomeSwipe(dayStep) {
-  const el = document.getElementById('homeView');
-  if (!el || state.view !== 'home' || el.dataset.animating === '1') return;
+  animateViewSwipe(dayStep);
+}
+
+function swipeTargetId(view) {
+  if (view === 'home') return 'homeView';
+  if (view === 'month') return 'monthGrid';
+  if (view === 'week') return 'weekGrid';
+  if (view === 'day') return 'dayViewInner';
+  return null;
+}
+
+function stepCursorForSwipe(view, dir) {
+  if (view === 'home' || view === 'day') {
+    state.cursor = addDays(state.cursor, dir);
+  } else if (view === 'week') {
+    state.cursor = addDays(state.cursor, dir * 7);
+  } else if (view === 'month') {
+    state.cursor = new Date(state.cursor.getFullYear(), state.cursor.getMonth() + dir, 1);
+  }
+}
+
+/** Свайп: dir > 0 — вперёд (влево), dir < 0 — назад (вправо) */
+function animateViewSwipe(dir) {
+  const view = state.view;
+  const id = swipeTargetId(view);
+  if (!id) return;
+  const el = document.getElementById(id);
+  if (!el || el.dataset.animating === '1') return;
   el.dataset.animating = '1';
 
-  const outClass = dayStep > 0 ? 'swipe-out-left' : 'swipe-out-right';
-  const inClass = dayStep > 0 ? 'swipe-in-right' : 'swipe-in-left';
+  const outClass = dir > 0 ? 'swipe-out-left' : 'swipe-out-right';
+  const inClass = dir > 0 ? 'swipe-in-right' : 'swipe-in-left';
   const DUR = 180;
 
   el.classList.add(outClass);
   setTimeout(() => {
-    state.cursor = addDays(state.cursor, dayStep);
-    renderHome();
+    stepCursorForSwipe(view, dir);
+    render();
 
-    el.classList.remove(outClass);
-    el.classList.add(inClass);
+    const el2 = document.getElementById(id) || el;
+    el2.classList.remove(outClass);
+    el2.classList.add(inClass);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        el.classList.remove(inClass);
+        el2.classList.remove(inClass);
       });
     });
 
     setTimeout(() => {
-      el.dataset.animating = '0';
+      el2.dataset.animating = '0';
     }, DUR + 40);
   }, DUR);
 }
 
-/** Свайп влево/вправо на главной — следующий/предыдущий день */
+/** Свайп влево/вправо на Главной / Месяц / Неделя / День */
 function bindHomeSwipe() {
-  const el = document.getElementById('homeView');
-  if (!el || el.dataset.swipeBound) return;
-  el.dataset.swipeBound = '1';
+  bindCalendarSwipes();
+}
 
-  let startX = 0, startY = 0, tracking = false;
+function bindCalendarSwipes() {
+  const targets = [
+    { id: 'homeView', views: ['home'] },
+    { id: 'monthGrid', views: ['month'] },
+    { id: 'weekGrid', views: ['week'] },
+    { id: 'dayViewInner', views: ['day'] }
+  ];
 
-  el.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1) return;
-    tracking = true;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  }, { passive: true });
+  targets.forEach(({ id, views }) => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.swipeBound) return;
+    el.dataset.swipeBound = '1';
 
-  el.addEventListener('touchend', e => {
-    if (!tracking || state.view !== 'home') { tracking = false; return; }
-    tracking = false;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - startX;
-    const dy = t.clientY - startY;
-    if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
-    animateHomeSwipe(dx < 0 ? 1 : -1);
-  }, { passive: true });
+    let startX = 0, startY = 0, tracking = false;
 
-  el.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
+    el.addEventListener('touchstart', e => {
+      if (e.touches.length !== 1) return;
+      tracking = true;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    el.addEventListener('touchend', e => {
+      if (!tracking || views.indexOf(state.view) < 0) { tracking = false; return; }
+      tracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+      animateViewSwipe(dx < 0 ? 1 : -1);
+    }, { passive: true });
+
+    el.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
+  });
 }
 
 /* ─── Рендер: Год (12 месяцев + ISO-недели, на один экран) ─── */
@@ -5825,7 +5883,20 @@ function applyTheme() {
 document.getElementById('viewTabs').addEventListener('click', e => {
   const btn = e.target.closest('button[data-view]');
   if (!btn) return;
-  switchView(btn.dataset.view);
+  const view = btn.dataset.view;
+  const t = new Date();
+  t.setHours(0, 0, 0, 0);
+  // Вкладки всегда открывают «сейчас» для своего масштаба
+  if (view === 'home' || view === 'day') {
+    state.cursor = t;
+  } else if (view === 'week') {
+    state.cursor = t;
+  } else if (view === 'month') {
+    state.cursor = new Date(t.getFullYear(), t.getMonth(), 1);
+  } else if (view === 'year') {
+    state.cursor = new Date(t.getFullYear(), 0, 1);
+  }
+  switchView(view);
 });
 
 document.getElementById('btnPrev').onclick = () => {
@@ -5932,6 +6003,18 @@ document.getElementById('btnSettingsBack').onclick = closeSettings;
 document.getElementById('btnSettingsSave').onclick = saveSettingsForm;
 document.getElementById('btnAddType').onclick = () => openTypeDialog(-1);
 document.getElementById('btnForceSync').onclick = () => {
+  // Галка в форме может быть включена, но ещё не сохранена — подхватываем сразу
+  const box = document.getElementById('sImportGcal');
+  if (box) {
+    state.settings.importGoogleCalendar = !!box.checked;
+    if (state.settings.importGoogleCalendar) ensureCalendarEventType();
+    saveSettings();
+  }
+  const urlBox = document.getElementById('sScriptUrl');
+  if (urlBox && urlBox.value.trim()) {
+    state.settings.scriptUrl = urlBox.value.trim();
+    saveSettings();
+  }
   sync(true);
 };
 document.getElementById('btnToggleDataSection').onclick = () => {
@@ -6013,7 +6096,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=32').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=36').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
