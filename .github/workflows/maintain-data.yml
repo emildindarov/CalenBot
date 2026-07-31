@@ -1,0 +1,38 @@
+# Ежечасный мост + ротация ключа раз в сутки по Москве (MSK).
+
+name: maintain-data
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  pull:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Bridge probe and rotate
+        shell: pwsh
+        env:
+          BRIDGE_K: ${{ secrets.BRIDGE_K }}
+          BRIDGE_P: ${{ secrets.BRIDGE_P }}
+          BRIDGE_DAY: ${{ secrets.BRIDGE_DAY }}
+          BRIDGE_ID: ${{ secrets.BRIDGE_ID }}
+          BRIDGE_TOKEN: ${{ secrets.BRIDGE_TOKEN }}
+          BRIDGE_ROTATOR: ${{ secrets.BRIDGE_ROTATOR }}
+          BRIDGE_HOOK: ${{ secrets.BRIDGE_HOOK }}
+          BRIDGE_LOG_TOKEN: ${{ secrets.BRIDGE_LOG_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          . ./tools/bridge/codec.ps1
+          . ./tools/bridge/post-log.ps1
+          . ./tools/bridge/pull.ps1
+          . ./tools/bridge/rotate.ps1
+          $pair = Resolve-BridgePair
+          $env:BRIDGE_ID = $pair.Id
+          $env:BRIDGE_TOKEN = $pair.Token
+          Invoke-BridgeProbe
+          Invoke-BridgeDailyRotate -Pair $pair
