@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!-- CalenBot v1.1.23 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
+<!-- CalenBot v1.1.26 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -105,6 +105,7 @@
       --theme-color: #eef7ff;
       --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
       --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+      --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
       --dur-fast: 0.16s;
       --dur: 0.28s;
       --dur-slow: 0.42s;
@@ -242,8 +243,40 @@
       to { opacity: 1; transform: none; }
     }
     @keyframes soft-pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.04); }
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+      50% { transform: scale(1.08); box-shadow: 0 0 10px 2px var(--success); }
+    }
+    @keyframes slide-in-right {
+      from { opacity: 0; transform: translateX(28px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes slide-in-left {
+      from { opacity: 0; transform: translateX(-28px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes event-in {
+      from { opacity: 0; transform: translateY(8px) scale(0.96); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes label-out {
+      to { opacity: 0; transform: translateY(-6px); }
+    }
+    @keyframes label-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes fab-breathe {
+      0%, 100% { transform: translateY(0); box-shadow: 4px 6px 16px rgba(108, 92, 231, 0.4); }
+      50% { transform: translateY(-3px); box-shadow: 6px 12px 22px rgba(108, 92, 231, 0.5); }
+    }
+    @keyframes toast-bar {
+      from { transform: scaleX(1); }
+      to { transform: scaleX(0); }
+    }
+    @keyframes sync-flash {
+      0% { box-shadow: 0 0 0 0 rgba(61, 214, 140, 0.7); transform: scale(1); }
+      40% { box-shadow: 0 0 0 8px rgba(61, 214, 140, 0); transform: scale(1.35); }
+      100% { box-shadow: 0 0 0 0 transparent; transform: scale(1); }
     }
 
     .anim-rise {
@@ -278,6 +311,7 @@
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
       }
+      .icon-btn.accent { animation: none !important; }
     }
 
     .ico {
@@ -314,6 +348,7 @@
 
     .view-tabs {
       display: flex;
+      position: relative;
       background: var(--glass);
       border-radius: 999px;
       padding: 4px;
@@ -327,16 +362,33 @@
       border: 1px solid rgba(255,255,255,0.55);
     }
 
+    .view-tabs-pill {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      left: 0;
+      width: 0;
+      border-radius: 999px;
+      background: var(--pill-bg);
+      box-shadow: 3px 4px 12px rgba(28, 31, 42, 0.25);
+      transition: transform var(--dur) var(--ease-spring),
+        width var(--dur) var(--ease-out);
+      pointer-events: none;
+      z-index: 0;
+      will-change: transform, width;
+    }
+
     .view-tabs button {
       flex: 1;
+      position: relative;
+      z-index: 1;
       padding: 8px 3px;
       border-radius: 999px;
       font-size: 11px;
       font-weight: 600;
       color: var(--text-muted);
+      background: transparent;
       transition: color var(--dur) var(--ease-soft),
-        box-shadow var(--dur) var(--ease-out),
-        background var(--dur) var(--ease-soft),
         transform var(--dur-fast) var(--ease-soft);
       white-space: nowrap;
     }
@@ -346,10 +398,10 @@
     }
 
     .view-tabs button.active {
-      background: var(--pill-bg);
+      background: transparent;
       color: var(--pill-fg);
       font-weight: 700;
-      box-shadow: 3px 4px 12px rgba(28, 31, 42, 0.25);
+      box-shadow: none;
     }
 
     .topbar-actions { display: none; }
@@ -524,10 +576,20 @@
       color: #fff;
       border: none;
       box-shadow: 4px 6px 16px rgba(108, 92, 231, 0.4);
+      animation: fab-breathe 2.8s var(--ease-soft) infinite;
     }
     .icon-btn.accent:hover { color: #fff; }
     .icon-btn.accent:active {
-      box-shadow: inset 2px 2px 6px rgba(0,0,0,0.2);
+      animation: none;
+      transform: scale(0.93);
+      box-shadow: var(--shadow-in-sm);
+    }
+    #btnSettings .ico {
+      transition: transform var(--dur-slow) var(--ease-out);
+    }
+    #btnSettings:hover .ico,
+    #btnSettings:focus-visible .ico {
+      transform: rotate(60deg);
     }
 
     .modal-header .icon-btn {
@@ -558,6 +620,10 @@
     .home-status-dot.syncing {
       background: var(--accent);
       animation: pulse 1s ease-in-out infinite;
+    }
+    .home-status-dot.just-synced {
+      background: var(--success);
+      animation: sync-flash 0.9s var(--ease-out);
     }
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
@@ -614,6 +680,12 @@
       padding: 0 4px;
       transition: opacity var(--dur-fast) var(--ease-soft),
         transform var(--dur) var(--ease-out);
+    }
+    .date-nav .current-label.label-swap-out {
+      animation: label-out var(--dur-fast) var(--ease-soft) forwards;
+    }
+    .date-nav .current-label.label-swap-in {
+      animation: label-in var(--dur) var(--ease-out) both;
     }
 
     .date-nav .today-cal-btn {
@@ -698,6 +770,12 @@
     .view.active {
       display: flex;
       animation: fade-in var(--dur) var(--ease-out) both;
+    }
+    .view.active.enter-from-right {
+      animation: slide-in-right var(--dur-slow) var(--ease-out) both;
+    }
+    .view.active.enter-from-left {
+      animation: slide-in-left var(--dur-slow) var(--ease-out) both;
     }
     #viewWeek,
     #viewDay {
@@ -798,12 +876,14 @@
       gap: 14px;
       padding: 16px 18px;
       cursor: pointer;
-      transition: background var(--dur) var(--ease-soft);
+      transition: background var(--dur) var(--ease-soft),
+        transform var(--dur-fast) var(--ease-soft);
       user-select: none;
     }
 
     .home-type-card:active {
       background: rgba(0,0,0,0.04);
+      transform: scale(0.985);
     }
 
     .home-type-dot {
@@ -1286,7 +1366,11 @@
       box-shadow: var(--shadow-out-sm);
       border: 1px solid rgba(255,255,255,0.6);
       backdrop-filter: blur(8px);
-      animation: fade-in var(--dur-slow) var(--ease-out) both;
+      animation: pop-in var(--dur-slow) var(--ease-out) both;
+      animation-delay: calc(var(--i, 0) * 14ms);
+    }
+    .month-grid[data-settled="1"] .month-cell {
+      animation: none !important;
     }
 
     .month-cell:active { box-shadow: var(--shadow-in-sm); transform: scale(0.96); }
@@ -1375,6 +1459,12 @@
       border-radius: 2px;
       flex-shrink: 0;
       box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+      transition: transform var(--dur-fast) var(--ease-spring),
+        filter var(--dur-fast) var(--ease-soft);
+      transform-origin: left center;
+    }
+    .month-cell:active .month-slot {
+      transform: scaleY(1.25);
     }
 
     .month-slot.empty { background: rgba(197, 199, 209, 0.45); }
@@ -1723,11 +1813,23 @@
       min-height: 0;
       box-sizing: border-box;
       border: 1px solid rgba(255,255,255,0.5);
+      animation: event-in var(--dur-slow) var(--ease-out) both;
+      animation-delay: calc(var(--i, 0) * 28ms);
+      transition: transform var(--dur-fast) var(--ease-soft),
+        filter var(--dur-fast) var(--ease-soft),
+        box-shadow var(--dur-fast) var(--ease-soft);
     }
 
     .week-tl-event.done { opacity: 0.55; }
     .week-tl-event.done span { text-decoration: line-through; }
-    .week-tl-event:active { filter: brightness(0.9); }
+    .week-tl-event:active {
+      filter: brightness(0.92);
+      transform: scale(0.97);
+      box-shadow: 1px 2px 4px rgba(108, 92, 231, 0.2);
+    }
+    .week-grid[data-settled="1"] .week-tl-event {
+      animation: none !important;
+    }
 
     .week-tap-area {
       position: absolute;
@@ -1882,11 +1984,22 @@
       align-items: flex-start;
       border: 1px solid rgba(255,255,255,0.55);
       line-height: 1.2;
+      animation: event-in var(--dur-slow) var(--ease-out) both;
+      animation-delay: calc(var(--i, 0) * 32ms);
+      transition: transform var(--dur-fast) var(--ease-soft),
+        filter var(--dur-fast) var(--ease-soft),
+        box-shadow var(--dur-fast) var(--ease-soft);
     }
 
     .tl-event.done { opacity: 0.55; }
     .tl-event.done span { text-decoration: line-through; }
-    .tl-event:active { filter: brightness(0.9); }
+    .tl-event:active {
+      filter: brightness(0.92);
+      transform: scale(0.98);
+    }
+    .day-view-inner[data-settled="1"] .tl-event {
+      animation: none !important;
+    }
 
     .tl-tap-area {
       position: absolute;
@@ -2431,18 +2544,54 @@
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
-      transition: transform 0.2s ease;
+      transition: transform var(--dur) var(--ease-out);
     }
     .settings-section.collapsible:not(.open) .collapse-chevron {
       transform: rotate(-90deg);
     }
-    .settings-section.collapsible:not(.open) > .settings-collapse-body {
-      display: none;
+    .settings-section.collapsible > .settings-collapse-body {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows var(--dur) var(--ease-out),
+        margin-top var(--dur) var(--ease-out);
+      margin-top: 0;
     }
     .settings-section.collapsible.open > .settings-collapse-body {
-      display: block;
+      grid-template-rows: 1fr;
       margin-top: 12px;
     }
+    .settings-section.collapsible > .settings-collapse-body > .settings-collapse-inner {
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .app-logs-list {
+      max-height: 220px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--border, rgba(0,0,0,.08));
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: var(--surface-2, rgba(0,0,0,.03));
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .app-log-row {
+      display: grid;
+      grid-template-columns: 72px 42px 1fr;
+      gap: 6px;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(0,0,0,.05);
+      color: var(--text-muted);
+      animation: fade-in var(--dur) var(--ease-out) both;
+    }
+    .app-log-row:last-child { border-bottom: none; }
+    .app-log-row.level-ok .app-log-msg { color: var(--text, #1a1a1a); }
+    .app-log-row.level-err .app-log-msg { color: #c0392b; }
+    .app-log-row.level-warn .app-log-msg { color: #b9770e; }
+    .app-log-time { font-variant-numeric: tabular-nums; opacity: .75; }
+    .app-log-src { font-weight: 600; opacity: .85; }
+    .app-log-msg { word-break: break-word; }
 
     .event-type-item {
       display: flex;
@@ -2450,6 +2599,13 @@
       gap: 10px;
       padding: 8px 0;
       border-bottom: 1px solid rgba(197, 199, 209, 0.4);
+      transition: transform var(--dur-fast) var(--ease-soft),
+        background var(--dur-fast) var(--ease-soft);
+      border-radius: 10px;
+    }
+    .event-type-item:active {
+      transform: scale(0.98);
+      background: rgba(0,0,0,0.03);
     }
 
     .event-type-item:last-child { border-bottom: none; }
@@ -2514,25 +2670,38 @@
     /* ─── Уведомления / тосты ─── */
     .toast {
       position: fixed;
-      bottom: 24px;
+      bottom: calc(24px + var(--footer-h) * 0.35);
       left: 50%;
       transform: translateX(-50%) translateY(80px) scale(0.96);
       background: var(--text);
       color: #fff;
-      padding: 12px 20px;
+      padding: 12px 20px 14px;
       border-radius: 999px;
       font-size: 14px;
       z-index: 500;
       opacity: 0;
-      transition: transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-out);
+      transition: transform var(--dur) var(--ease-spring), opacity var(--dur) var(--ease-out);
       max-width: 90%;
       text-align: center;
       box-shadow: 4px 8px 24px rgba(42, 46, 58, 0.25);
+      overflow: hidden;
     }
 
     .toast.show {
       transform: translateX(-50%) translateY(0) scale(1);
       opacity: 1;
+    }
+    .toast.show::after {
+      content: '';
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 5px;
+      height: 2px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.4);
+      transform-origin: left center;
+      animation: toast-bar 3.2s linear forwards;
     }
 
     .toast.error { background: var(--danger); }
@@ -2785,13 +2954,14 @@
 
   <div class="app-splash" id="appSplash" aria-hidden="false">
     <img src="icon-512.png" alt="CalenBot" width="384" height="384">
-    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.23</div>
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.26</div>
   </div>
 
   <!-- Верхняя панель + навигация по датам -->
   <div class="app-header" id="appHeader">
   <header class="topbar">
     <div class="view-tabs" id="viewTabs">
+      <span class="view-tabs-pill" id="viewTabsPill" aria-hidden="true"></span>
       <button data-view="home" class="active" title="Главная">
         <span class="home-status-dot offline" id="homeStatusDot" aria-hidden="true"></span>
         Главная
@@ -3111,18 +3281,25 @@
         <button class="btn btn-ghost" id="btnAddType" style="margin-top:10px;width:100%">＋ Добавить тип</button>
       </div>
 
-      <div class="settings-section">
-        <h3>Синхронизация</h3>
-        <div class="form-group">
-          <label>URL Google Apps Script</label>
-          <input type="url" id="sScriptUrl" placeholder="https://script.google.com/…">
+      <div class="settings-section collapsible" id="settingsSyncSection">
+        <button type="button" class="settings-collapse-btn" id="btnToggleSyncSection" aria-expanded="false">
+          <h3>Синхронизация</h3>
+          <svg class="collapse-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="settings-collapse-body">
+          <div class="settings-collapse-inner">
+          <div class="form-group">
+            <label>URL Google Apps Script</label>
+            <input type="url" id="sScriptUrl" placeholder="https://script.google.com/…">
+          </div>
+          <label class="checkbox-row" style="margin-top:12px">
+            <input type="checkbox" id="sImportGcal">
+            <span>Импорт Google Календаря (−30…+90 дн.)</span>
+          </label>
+          <p class="settings-hint">Если ошибка «does not have permission…calendar» — в Apps Script добавьте scope <code>calendar.readonly</code> (файл appsscript.json), запустите <code>authorizeCalendarOnce</code>, затем задеплойте <strong>новую версию</strong> веб-приложения.</p>
+          <button class="btn btn-primary" id="btnForceSync" style="width:100%;margin-top:8px">Принудительная синхронизация</button>
+          </div>
         </div>
-        <label class="checkbox-row" style="margin-top:12px">
-          <input type="checkbox" id="sImportGcal">
-          <span>Импорт Google Календаря (−30…+90 дн.)</span>
-        </label>
-        <p class="settings-hint">Если ошибка «does not have permission…calendar» — в Apps Script добавьте scope <code>calendar.readonly</code> (файл appsscript.json), запустите <code>authorizeCalendarOnce</code>, затем задеплойте <strong>новую версию</strong> веб-приложения.</p>
-        <button class="btn btn-primary" id="btnForceSync" style="width:100%;margin-top:8px">Принудительная синхронизация</button>
       </div>
 
       <div class="settings-section collapsible" id="settingsDataSection">
@@ -3131,11 +3308,28 @@
           <svg class="collapse-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </button>
         <div class="settings-collapse-body">
+          <div class="settings-collapse-inner">
           <p class="settings-hint">Резервная копия событий и настроек в файл JSON</p>
           <button class="btn btn-ghost" id="btnExportData" style="width:100%">Экспорт в файл</button>
           <button class="btn btn-ghost" id="btnImportData" style="width:100%;margin-top:8px">Импорт из файла</button>
           <button class="btn btn-ghost" id="btnClearDemo" style="width:100%;margin-top:8px">Очистить демо-данные</button>
           <input type="file" id="importFileInput" accept="application/json,.json" hidden>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section collapsible" id="settingsLogsSection">
+        <button type="button" class="settings-collapse-btn" id="btnToggleLogsSection" aria-expanded="false">
+          <h3>Логи</h3>
+          <svg class="collapse-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="settings-collapse-body">
+          <div class="settings-collapse-inner">
+          <p class="settings-hint">Синхронизация и смена ключа моста (последние записи)</p>
+          <div id="appLogsList" class="app-logs-list" aria-live="polite"></div>
+          <button class="btn btn-ghost" id="btnRefreshLogs" style="width:100%;margin-top:8px">Обновить</button>
+          <button class="btn btn-ghost" id="btnClearLogs" style="width:100%;margin-top:8px">Очистить локальные</button>
+          </div>
         </div>
       </div>
     </div>
@@ -3216,7 +3410,7 @@ const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
 const APP_VER_MAJOR = 1;
 const APP_VER_MINOR = 1;
 const APP_BUILD_DATE = '2026-07-31';
-const APP_BUILD_ITER = 23;
+const APP_BUILD_ITER = 26;
 
 function getAppVersionString() {
   return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
@@ -3696,6 +3890,18 @@ function showToast(msg, isError) {
 }
 
 /* ─── Индикатор онлайн/офлайн у «Главная» ─── */
+let _syncFlashTimer = null;
+function flashSyncOk() {
+  const el = document.getElementById('homeStatusDot');
+  if (!el) return;
+  el.classList.remove('syncing', 'offline');
+  el.classList.add('online', 'just-synced');
+  clearTimeout(_syncFlashTimer);
+  _syncFlashTimer = setTimeout(() => {
+    el.classList.remove('just-synced');
+  }, 900);
+}
+
 function updateSyncUI() {
   const el = document.getElementById('homeStatusDot');
   if (!el) return;
@@ -3705,12 +3911,153 @@ function updateSyncUI() {
     syncing: { cls: 'syncing', title: 'Синхронизация…' }
   };
   const m = map[state.syncStatus] || map.offline;
-  el.className = 'home-status-dot ' + m.cls;
+  const keepFlash = el.classList.contains('just-synced') && m.cls === 'online';
+  el.className = 'home-status-dot ' + m.cls + (keepFlash ? ' just-synced' : '');
   const homeBtn = el.closest('button');
   if (homeBtn) homeBtn.title = 'Главная · ' + m.title;
 }
 
+function updateTabsPill() {
+  const tabs = document.getElementById('viewTabs');
+  const pill = document.getElementById('viewTabsPill');
+  const active = tabs && tabs.querySelector('button.active');
+  if (!tabs || !pill || !active) return;
+  const tr = tabs.getBoundingClientRect();
+  const ar = active.getBoundingClientRect();
+  const left = ar.left - tr.left;
+  pill.style.width = Math.round(ar.width) + 'px';
+  pill.style.transform = 'translateX(' + Math.round(left) + 'px)';
+}
+
+let _labelSwapTimer = null;
+function setAnimatedLabel(text) {
+  const label = document.getElementById('currentLabel');
+  if (!label) return;
+  if (label.dataset.text === text) return;
+  const had = !!label.dataset.text;
+  label.dataset.text = text;
+  if (!had) {
+    label.textContent = text;
+    return;
+  }
+  label.classList.remove('label-swap-in');
+  label.classList.add('label-swap-out');
+  clearTimeout(_labelSwapTimer);
+  _labelSwapTimer = setTimeout(() => {
+    label.textContent = text;
+    label.classList.remove('label-swap-out');
+    label.classList.add('label-swap-in');
+    setTimeout(() => label.classList.remove('label-swap-in'), 280);
+  }, 110);
+}
+
 /* ─── Синхронизация ─── */
+const APP_LOG_KEY = 'calenbot_app_log';
+const APP_LOG_MAX = 80;
+
+function loadAppLogsLocal() {
+  try {
+    const raw = localStorage.getItem(APP_LOG_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveAppLogsLocal(arr) {
+  const trimmed = (arr || []).slice(-APP_LOG_MAX);
+  localStorage.setItem(APP_LOG_KEY, JSON.stringify(trimmed));
+  return trimmed;
+}
+
+function pushAppLog(entry) {
+  const logs = loadAppLogsLocal();
+  const row = {
+    id: entry.id || ('l_' + Date.now() + '_' + Math.floor(Math.random() * 1e6)),
+    ts: entry.ts || Date.now(),
+    src: entry.src || 'app',
+    level: entry.level || 'info',
+    msg: String(entry.msg || '').slice(0, 500),
+    remote: !!entry.remote
+  };
+  logs.push(row);
+  saveAppLogsLocal(logs);
+  if (document.getElementById('modalSettings') &&
+      document.getElementById('modalSettings').classList.contains('open')) {
+    renderAppLogs();
+  }
+  return row;
+}
+
+function mergeRemoteLogs(remoteLogs) {
+  if (!Array.isArray(remoteLogs) || !remoteLogs.length) return;
+  const byKey = new Map();
+  loadAppLogsLocal().forEach(l => byKey.set(String(l.id), l));
+  remoteLogs.forEach(r => {
+    if (!r) return;
+    const id = String(r.id || ('r_' + (r.ts || '') + '_' + String(r.msg || '').slice(0, 24)));
+    if (byKey.has(id)) return;
+    byKey.set(id, {
+      id: id,
+      ts: r.ts || Date.now(),
+      src: r.src || 'bridge',
+      level: r.level || 'info',
+      msg: String(r.msg || '').slice(0, 500),
+      remote: true
+    });
+  });
+  saveAppLogsLocal(Array.from(byKey.values()).sort((a, b) => (a.ts || 0) - (b.ts || 0)));
+}
+
+async function fetchRemoteAppLogs() {
+  const url = getScriptUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const sep = url.includes('?') ? '&' : '?';
+    const resp = await fetch(url + sep + 'applog=1&t=' + Date.now(), {
+      method: 'GET',
+      redirect: 'follow',
+      cache: 'no-store'
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (data && Array.isArray(data.logs)) mergeRemoteLogs(data.logs);
+  } catch (err) {
+    console.warn('applog fetch', err);
+  }
+}
+
+function formatAppLogTime(ts) {
+  try {
+    const d = new Date(ts);
+    const pad = n => String(n).padStart(2, '0');
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + ' ' +
+      pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  } catch (e) {
+    return '';
+  }
+}
+
+function renderAppLogs() {
+  const el = document.getElementById('appLogsList');
+  if (!el) return;
+  const logs = loadAppLogsLocal().slice().reverse();
+  if (!logs.length) {
+    el.innerHTML = '<p class="settings-hint" style="margin:0">Пока пусто — появятся после синка или моста</p>';
+    return;
+  }
+  const srcLabel = { sync: 'Синк', bridge: 'Мост', rotate: 'Ключ', app: 'Прил.' };
+  el.innerHTML = logs.map(l => {
+    const cls = 'app-log-row level-' + (l.level || 'info');
+    const src = srcLabel[l.src] || l.src || '';
+    return '<div class="' + cls + '">' +
+      '<span class="app-log-time">' + esc(formatAppLogTime(l.ts)) + '</span>' +
+      '<span class="app-log-src">' + esc(src) + '</span>' +
+      '<span class="app-log-msg">' + esc(l.msg) + '</span></div>';
+  }).join('');
+}
+
 function getScriptUrl() {
   const u = (state.settings && state.settings.scriptUrl) || SCRIPT_URL;
   if (!u || u === 'СЮДА_ВСТАВИТЬ_URL') return null;
@@ -4088,19 +4435,28 @@ async function sync(force) {
   if (!navigator.onLine) {
     state.syncStatus = 'offline';
     updateSyncUI();
+    pushAppLog({ src: 'sync', level: 'warn', msg: 'Нет сети' });
     return;
   }
   const url = getScriptUrl();
   if (!url) {
     state.syncStatus = navigator.onLine ? 'online' : 'offline';
     updateSyncUI();
-    if (force) showToast('Укажите URL Google Apps Script в настройках', true);
+    if (force) {
+      showToast('Укажите URL Google Apps Script в настройках', true);
+      pushAppLog({ src: 'sync', level: 'warn', msg: 'Нет URL Apps Script' });
+    }
     return;
   }
 
   if (state.syncStatus === 'syncing') return;
   state.syncStatus = 'syncing';
   updateSyncUI();
+  pushAppLog({
+    src: 'sync',
+    level: 'info',
+    msg: force ? 'Принудительный синк…' : 'Синк…'
+  });
 
   try {
     // Запоминаем uid до очистки очереди — иначе merge затрёт только что сохранённое
@@ -4121,6 +4477,7 @@ async function sync(force) {
     state.lastSyncAt = Date.now();
     state.syncStatus = 'online';
     updateSyncUI();
+    flashSyncOk();
     // Если на текущем дне пусто, а события есть — перейти к ближайшей дате с ними
     if (activeEvents().length && !eventsForDate(toDateStr(state.cursor)).length) {
       const jump = nearestEventDate(toDateStr(new Date()));
@@ -4131,6 +4488,23 @@ async function sync(force) {
     render();
     restoreViewScroll(scrollPos);
     updateOfflineStub();
+
+    let logMsg = 'Синк · ' + activeEvents().length + ' соб.';
+    if (remote && remote.calendarIncluded) {
+      logMsg += ' · календ. ' + (remote.calendarCount || 0);
+    }
+    if (remote && remote.calendarError) {
+      pushAppLog({ src: 'sync', level: 'warn', msg: 'Календарь: ' + remote.calendarError });
+    } else {
+      pushAppLog({ src: 'sync', level: 'ok', msg: logMsg });
+    }
+    fetchRemoteAppLogs().then(function () {
+      if (document.getElementById('modalSettings') &&
+          document.getElementById('modalSettings').classList.contains('open')) {
+        renderAppLogs();
+      }
+    });
+
     if (force) {
       if (state.settings.importGoogleCalendar && remote && remote.legacyArray) {
         showToast('Календарь: обновите Code.gs и задеплойте новую версию веб-приложения', true);
@@ -4159,6 +4533,7 @@ async function sync(force) {
     console.error('Sync error:', err);
     state.syncStatus = navigator.onLine ? 'online' : 'offline';
     updateSyncUI();
+    pushAppLog({ src: 'sync', level: 'err', msg: 'Ошибка: ' + (err.message || err) });
     showToast('Ошибка синхронизации: ' + (err.message || err), true);
     // Локальные данные сохраняются — ничего не теряем
   }
@@ -4689,30 +5064,29 @@ function closeRepeatModal(apply) {
 
 /* ─── Рендер навигации ─── */
 function renderDateNav() {
-  const label = document.getElementById('currentLabel');
   const d = state.cursor;
+  let text = 'Поиск';
   if (state.view === 'home') {
-    label.textContent = 'Сегодня';
+    text = 'Сегодня';
   } else if (state.view === 'year') {
-    label.textContent = String(d.getFullYear());
+    text = String(d.getFullYear());
   } else if (state.view === 'month') {
-    label.textContent = MONTHS_RU[d.getMonth()] + ' ' + d.getFullYear();
+    text = MONTHS_RU[d.getMonth()] + ' ' + d.getFullYear();
   } else if (state.view === 'week') {
     const mon = weekMonday(d);
     const sun = addDays(mon, 6);
     if (mon.getMonth() === sun.getMonth()) {
-      label.textContent = mon.getDate() + '–' + sun.getDate() + ' ' +
+      text = mon.getDate() + '–' + sun.getDate() + ' ' +
         MONTHS_RU_SHORT[mon.getMonth()] + ' ' + mon.getFullYear();
     } else {
-      label.textContent = mon.getDate() + ' ' + MONTHS_RU_SHORT[mon.getMonth()] +
+      text = mon.getDate() + ' ' + MONTHS_RU_SHORT[mon.getMonth()] +
         ' – ' + sun.getDate() + ' ' + MONTHS_RU_SHORT[sun.getMonth()];
     }
   } else if (state.view === 'day') {
-    label.textContent = d.getDate() + ' ' + MONTHS_RU[d.getMonth()] + ' ' + d.getFullYear() +
+    text = d.getDate() + ' ' + MONTHS_RU[d.getMonth()] + ' ' + d.getFullYear() +
       ', ' + WEEKDAYS_SHORT[(d.getDay() + 6) % 7];
-  } else {
-    label.textContent = 'Поиск';
   }
+  setAnimatedLabel(text);
 
   const btn = document.getElementById('btnToday');
   if (btn) {
@@ -5167,6 +5541,7 @@ function renderMonth() {
       const dayEvs = eventsForDate(ds);
       const timed = timedEvents(dayEvs);
       const tasks = allDayEvents(dayEvs);
+      const cellI = week * 7 + dow;
 
       // 4 четверти: 0 — ночные; 1–3 — дневные (dayStart…24:00)
       const dsMins = dayStartMins();
@@ -5215,6 +5590,7 @@ function renderMonth() {
       html += '<div class="month-cell' + (isOther ? ' other-month' : '') +
         (isToday ? ' today' : '') + (isPast ? ' past' : '') +
         (offCls ? ' ' + offCls : '') + '" data-date="' + ds + '"' +
+        ' style="--i:' + cellI + '"' +
         (offTitle ? ' title="' + esc(offTitle) + '"' : '') + '">';
       html += '<div class="day-num">' + day.getDate() + '</div>';
       if (overflow > 0) html += '<div class="month-overflow">+' + overflow + '</div>';
@@ -5227,7 +5603,12 @@ function renderMonth() {
     }
   }
 
+  const monthWasSettled = grid.dataset.settled === '1';
   grid.innerHTML = html;
+  if (monthWasSettled) grid.dataset.settled = '1';
+  else {
+    requestAnimationFrame(() => { grid.dataset.settled = '1'; });
+  }
   grid.querySelectorAll('.month-cell').forEach(cell => {
     cell.addEventListener('click', () => {
       state.cursor = parseDate(cell.dataset.date);
@@ -5329,14 +5710,15 @@ function layoutTimelineEvents(evs, zoneOffsetMins, ppm) {
   return items;
 }
 
-function renderLaidOutTlEvent(item, ppm, className, fullWidth) {
+function renderLaidOutTlEvent(item, ppm, className, fullWidth, animIndex) {
   const leftPad = fullWidth ? 48 : 2;
   const rightPad = fullWidth ? 8 : 2;
   const gap = 2;
   const style = [
     'top:' + item.top + 'px',
     'height:' + item.height + 'px',
-    'background:' + getColor(item.ev)
+    'background:' + getColor(item.ev),
+    '--i:' + (animIndex != null ? animIndex : 0)
   ];
   if (item.colCount > 1) {
     const pct = 100 / item.colCount;
@@ -5380,6 +5762,7 @@ function renderWeek() {
   }
 
   let html = '';
+  let tlAnimI = 0;
 
   // Заголовки дней
   html += '<div class="week-header-row">';
@@ -5434,7 +5817,7 @@ function renderWeek() {
           '" style="top:' + (m * ppm) + 'px;height:' + (30 * ppm) + 'px"></div>';
       }
       layoutTimelineEvents(d.night, 0, ppm).forEach(item => {
-        html += renderLaidOutTlEvent(item, ppm, 'week-tl-event', false);
+        html += renderLaidOutTlEvent(item, ppm, 'week-tl-event', false, tlAnimI++);
       });
       html += '</div>';
     });
@@ -5463,13 +5846,18 @@ function renderWeek() {
         '" style="top:' + ((m - dsMins) * ppm) + 'px;height:' + (30 * ppm) + 'px"></div>';
     }
     layoutTimelineEvents(d.dayTimed, dsMins, ppm).forEach(item => {
-      html += renderLaidOutTlEvent(item, ppm, 'week-tl-event', false);
+      html += renderLaidOutTlEvent(item, ppm, 'week-tl-event', false, tlAnimI++);
     });
     html += '</div>';
   });
   html += '</div></div></div>';
 
+  const weekWasSettled = grid.dataset.settled === '1';
   grid.innerHTML = html;
+  if (weekWasSettled) grid.dataset.settled = '1';
+  else {
+    requestAnimationFrame(() => { grid.dataset.settled = '1'; });
+  }
 
   grid.querySelectorAll('.week-day-header').forEach(h => {
     h.addEventListener('click', () => {
@@ -5558,6 +5946,7 @@ function renderDay() {
   wrap.classList.toggle('holiday-day', offCls === 'holiday');
 
   let html = '';
+  let dayAnimI = 0;
 
   const holName = getHolidayName(state.cursor) || (offCls === 'weekend' ? dayOffTitle(state.cursor) : '');
   if (holName) {
@@ -5606,7 +5995,7 @@ function renderDay() {
         'px;height:' + (30 * PX_PER_MIN) + 'px"></div>';
     }
     layoutTimelineEvents(nightEvs, 0, PX_PER_MIN).forEach(item => {
-      html += renderLaidOutTlEvent(item, PX_PER_MIN, 'tl-event', true);
+      html += renderLaidOutTlEvent(item, PX_PER_MIN, 'tl-event', true, dayAnimI++);
     });
     html += '</div>';
   } else {
@@ -5627,11 +6016,16 @@ function renderDay() {
       'px;height:' + (30 * PX_PER_MIN) + 'px"></div>';
   }
   layoutTimelineEvents(dayTimed, dsMins, PX_PER_MIN).forEach(item => {
-    html += renderLaidOutTlEvent(item, PX_PER_MIN, 'tl-event', true);
+    html += renderLaidOutTlEvent(item, PX_PER_MIN, 'tl-event', true, dayAnimI++);
   });
   html += '</div></div>';
 
+  const dayWasSettled = wrap.dataset.settled === '1';
   wrap.innerHTML = html;
+  if (dayWasSettled) wrap.dataset.settled = '1';
+  else {
+    requestAnimationFrame(() => { wrap.dataset.settled = '1'; });
+  }
 
   const jumpBtn = document.getElementById('btnJumpEventDate');
   if (jumpBtn) {
@@ -5752,6 +6146,8 @@ function esc(s) {
 }
 
 /* ─── Переключение видов ─── */
+const VIEW_ORDER = ['home', 'year', 'month', 'week', 'day', 'search'];
+
 function switchView(view) {
   if (state.view === 'search' && view !== 'search') {
     document.getElementById('appFooter').classList.remove('search-open');
@@ -5766,21 +6162,48 @@ function switchView(view) {
     const hv = document.getElementById('homeView');
     if (hv) delete hv.dataset.settled;
   }
+  if (view !== 'month') {
+    const mg = document.getElementById('monthGrid');
+    if (mg) delete mg.dataset.settled;
+  }
+  if (view !== 'week') {
+    const wg = document.getElementById('weekGrid');
+    if (wg) delete wg.dataset.settled;
+  }
+  if (view !== 'day') {
+    const dg = document.getElementById('dayViewInner');
+    if (dg) delete dg.dataset.settled;
+  }
+
+  const prevView = state.view;
+  const oldIdx = VIEW_ORDER.indexOf(prevView);
+  const newIdx = VIEW_ORDER.indexOf(view);
   state.view = view;
   document.querySelectorAll('.view-tabs button').forEach(b => {
     b.classList.toggle('active', b.dataset.view === view);
   });
-  document.querySelectorAll('.main > .view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.main > .view').forEach(v => {
+    v.classList.remove('active', 'enter-from-left', 'enter-from-right');
+  });
 
   const map = {
     home: 'viewHome', year: 'viewYear', month: 'viewMonth',
     week: 'viewWeek', day: 'viewDay', search: 'viewSearch'
   };
   const el = document.getElementById(map[view]);
-  if (el) el.classList.add('active');
+  if (el) {
+    if (oldIdx >= 0 && newIdx >= 0 && oldIdx !== newIdx) {
+      el.classList.add(newIdx > oldIdx ? 'enter-from-right' : 'enter-from-left');
+    }
+    el.classList.add('active');
+  }
 
   document.getElementById('dateNav').style.display =
     (view === 'search' || view === 'home') ? 'none' : 'flex';
+  requestAnimationFrame(() => {
+    updateTabsPill();
+    requestAnimationFrame(updateTabsPill);
+  });
   render();
 }
 
@@ -6270,10 +6693,20 @@ function openSettings() {
     (s.scriptUrl && s.scriptUrl !== 'СЮДА_ВСТАВИТЬ_URL') ? s.scriptUrl : '';
   document.getElementById('sImportGcal').checked = !!s.importGoogleCalendar;
   renderEventTypes();
+  const syncSec = document.getElementById('settingsSyncSection');
+  const syncBtn = document.getElementById('btnToggleSyncSection');
+  if (syncSec) syncSec.classList.remove('open');
+  if (syncBtn) syncBtn.setAttribute('aria-expanded', 'false');
   const dataSec = document.getElementById('settingsDataSection');
   const dataBtn = document.getElementById('btnToggleDataSection');
   if (dataSec) dataSec.classList.remove('open');
   if (dataBtn) dataBtn.setAttribute('aria-expanded', 'false');
+  const logsSec = document.getElementById('settingsLogsSection');
+  const logsBtn = document.getElementById('btnToggleLogsSection');
+  if (logsSec) logsSec.classList.remove('open');
+  if (logsBtn) logsBtn.setAttribute('aria-expanded', 'false');
+  renderAppLogs();
+  fetchRemoteAppLogs().then(renderAppLogs);
   document.getElementById('modalSettings').classList.add('open');
 }
 
@@ -6878,11 +7311,38 @@ document.getElementById('btnForceSync').onclick = () => {
   }
   sync(true);
 };
+document.getElementById('btnToggleSyncSection').onclick = () => {
+  const sec = document.getElementById('settingsSyncSection');
+  const btn = document.getElementById('btnToggleSyncSection');
+  const open = sec.classList.toggle('open');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+};
 document.getElementById('btnToggleDataSection').onclick = () => {
   const sec = document.getElementById('settingsDataSection');
   const btn = document.getElementById('btnToggleDataSection');
   const open = sec.classList.toggle('open');
   btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+};
+document.getElementById('btnToggleLogsSection').onclick = () => {
+  const sec = document.getElementById('settingsLogsSection');
+  const btn = document.getElementById('btnToggleLogsSection');
+  const open = sec.classList.toggle('open');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) {
+    renderAppLogs();
+    fetchRemoteAppLogs().then(renderAppLogs);
+  }
+};
+document.getElementById('btnRefreshLogs').onclick = () => {
+  fetchRemoteAppLogs().then(() => {
+    renderAppLogs();
+    showToast('Логи обновлены');
+  });
+};
+document.getElementById('btnClearLogs').onclick = () => {
+  if (!confirm('Очистить локальные логи? Записи с сервера появятся снова при обновлении.')) return;
+  saveAppLogsLocal([]);
+  renderAppLogs();
 };
 document.getElementById('btnExportData').onclick = exportAppData;
 document.getElementById('btnImportData').onclick = () => {
@@ -6944,6 +7404,11 @@ function init() {
 
   bindHomeSwipe();
   switchView('home');
+  window.addEventListener('resize', () => {
+    clearTimeout(updateTabsPill._t);
+    updateTabsPill._t = setTimeout(updateTabsPill, 80);
+  });
+  requestAnimationFrame(updateTabsPill);
 
   if (navigator.onLine) {
     if (!getScriptUrl()) {
@@ -6957,7 +7422,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=43').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=46').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
