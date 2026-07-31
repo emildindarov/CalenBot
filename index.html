@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!-- CalenBot v1.1.20 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
+<!-- CalenBot v1.1.22 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -683,23 +683,27 @@
       gap: 10px;
     }
 
-    .home-type-card {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 16px 18px;
+    .home-type-block {
       border-radius: 20px;
       background: var(--glass-strong);
       border: 1px solid rgba(255,255,255,0.65);
       box-shadow: var(--shadow-out-sm);
       backdrop-filter: blur(10px);
+      overflow: hidden;
+    }
+
+    .home-type-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
       cursor: pointer;
-      transition: transform 0.12s, box-shadow 0.12s;
+      transition: background 0.12s;
+      user-select: none;
     }
 
     .home-type-card:active {
-      transform: scale(0.98);
-      box-shadow: var(--shadow-in-sm);
+      background: rgba(0,0,0,0.04);
     }
 
     .home-type-dot {
@@ -730,6 +734,64 @@
     .home-type-count.zero {
       color: var(--text-muted);
       opacity: 0.55;
+    }
+
+    .home-type-chevron {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      stroke: var(--text-muted);
+      fill: none;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform 0.2s ease;
+      transform: rotate(-90deg);
+    }
+    .home-type-block.open .home-type-chevron {
+      transform: rotate(0deg);
+    }
+
+    .home-type-events {
+      display: none;
+      padding: 0 10px 12px;
+      border-top: 1px solid rgba(120,140,180,0.12);
+    }
+    .home-type-block.open .home-type-events {
+      display: block;
+    }
+
+    .home-type-event {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 8px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .home-type-event:active {
+      background: var(--accent-soft);
+    }
+    .home-type-event.done .home-ev-title {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+    .home-ev-time {
+      flex-shrink: 0;
+      min-width: 3.2em;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      padding-top: 2px;
+    }
+    .home-ev-title {
+      flex: 1;
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.35;
     }
 
     .home-empty {
@@ -2485,7 +2547,7 @@
 
   <div class="app-splash" id="appSplash" aria-hidden="false">
     <img src="icon-512.png" alt="CalenBot" width="384" height="384">
-    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.20</div>
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.22</div>
   </div>
 
   <!-- Верхняя панель + навигация по датам -->
@@ -2915,8 +2977,8 @@ const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
  */
 const APP_VER_MAJOR = 1;
 const APP_VER_MINOR = 1;
-const APP_BUILD_DATE = '2026-07-30';
-const APP_BUILD_ITER = 20;
+const APP_BUILD_DATE = '2026-07-31';
+const APP_BUILD_ITER = 22;
 
 function getAppVersionString() {
   return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
@@ -3100,7 +3162,8 @@ const state = {
   dataLoaded: false,
   draftRepeatRule: null,
   prevRepeatType: 'none',
-  viewBeforeSearch: 'home'
+  viewBeforeSearch: 'home',
+  homeExpandedType: null
 };
 
 /* ─── Утилиты дат ─── */
@@ -4586,11 +4649,34 @@ function renderHome() {
   } else {
     visibleTypes.forEach(t => {
       const n = counts[t.name] || 0;
-      html += '<div class="home-type-card" data-type="' + esc(t.name) + '">';
+      const typeEvs = dayEvs
+        .filter(ev => (ev.groupName || 'Прочее') === t.name)
+        .slice()
+        .sort((a, b) => {
+          const aAll = isAllDay(a) || !a.start_time;
+          const bAll = isAllDay(b) || !b.start_time;
+          if (aAll !== bAll) return aAll ? -1 : 1;
+          return (timeToMinutes(a.start_time) || 0) - (timeToMinutes(b.start_time) || 0);
+        });
+      const open = state.homeExpandedType === t.name;
+      html += '<div class="home-type-block' + (open ? ' open' : '') + '" data-type="' + esc(t.name) + '">';
+      html += '<div class="home-type-card" role="button" aria-expanded="' + (open ? 'true' : 'false') + '">';
       html += '<span class="home-type-dot" style="background:' + (t.color || '#e8e0ff') + '"></span>';
       html += '<span class="home-type-name">' + esc(t.name) + '</span>';
       html += '<span class="home-type-count">' + n + '</span>';
+      html += '<svg class="home-type-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
       html += '</div>';
+      html += '<div class="home-type-events">';
+      typeEvs.forEach(ev => {
+        const timeLabel = (isAllDay(ev) || !ev.start_time)
+          ? 'день'
+          : (ev.start_time + (ev.end_time ? '–' + ev.end_time : ''));
+        html += '<div class="home-type-event' + (isDone(ev) ? ' done' : '') + '" data-uid="' + ev.uid + '">';
+        html += '<span class="home-ev-time">' + esc(timeLabel) + '</span>';
+        html += '<span class="home-ev-title">' + esc(getTitle(ev)) + '</span>';
+        html += '</div>';
+      });
+      html += '</div></div>';
     });
   }
   html += '</div>';
@@ -4598,7 +4684,29 @@ function renderHome() {
 
   wrap.querySelectorAll('.home-type-card').forEach(card => {
     card.addEventListener('click', () => {
-      switchView('day');
+      const block = card.closest('.home-type-block');
+      if (!block) return;
+      const typeName = block.dataset.type;
+      const willOpen = !block.classList.contains('open');
+      wrap.querySelectorAll('.home-type-block.open').forEach(el => {
+        el.classList.remove('open');
+        const c = el.querySelector('.home-type-card');
+        if (c) c.setAttribute('aria-expanded', 'false');
+      });
+      if (willOpen) {
+        block.classList.add('open');
+        card.setAttribute('aria-expanded', 'true');
+        state.homeExpandedType = typeName;
+      } else {
+        state.homeExpandedType = null;
+      }
+    });
+  });
+
+  wrap.querySelectorAll('.home-type-event').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      openDetail(el.dataset.uid);
     });
   });
 
@@ -6603,7 +6711,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=40').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=42').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
