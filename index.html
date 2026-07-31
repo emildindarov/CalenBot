@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!-- CalenBot v1.1.22 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
+<!-- CalenBot v1.1.23 — glass / soft gradient UI (v1.0: BackUp / index.v1.0.html) -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -103,6 +103,11 @@
       --pill-bg: #1c1f2a;
       --pill-fg: #fff;
       --theme-color: #eef7ff;
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+      --dur-fast: 0.16s;
+      --dur: 0.28s;
+      --dur-slow: 0.42s;
     }
 
     html[data-theme="dark"] {
@@ -213,11 +218,66 @@
       background: var(--glass-strong);
       box-shadow: var(--shadow-in);
       backdrop-filter: blur(8px);
+      transition: box-shadow var(--dur-fast) var(--ease-soft),
+        background var(--dur-fast) var(--ease-soft),
+        transform var(--dur-fast) var(--ease-soft);
     }
 
     input:focus, select:focus, textarea:focus {
       outline: none;
       box-shadow: var(--shadow-in), 0 0 0 2px var(--accent-soft);
+    }
+
+    /* ─── Motion system ─── */
+    @keyframes rise-in {
+      from { opacity: 0; transform: translateY(12px) scale(0.98); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes pop-in {
+      from { opacity: 0; transform: scale(0.92); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes soft-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+
+    .anim-rise {
+      animation: rise-in var(--dur-slow) var(--ease-out) both;
+    }
+    .anim-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+    .anim-stagger > *:nth-child(2) { animation-delay: 0.06s; }
+    .anim-stagger > *:nth-child(3) { animation-delay: 0.1s; }
+    .anim-stagger > *:nth-child(4) { animation-delay: 0.14s; }
+    .anim-stagger > *:nth-child(5) { animation-delay: 0.18s; }
+    .anim-stagger > *:nth-child(6) { animation-delay: 0.22s; }
+    .anim-stagger > *:nth-child(7) { animation-delay: 0.26s; }
+    .anim-stagger > *:nth-child(8) { animation-delay: 0.3s; }
+    .anim-stagger > *:nth-child(n+9) { animation-delay: 0.34s; }
+
+    .pressable {
+      transition: transform var(--dur-fast) var(--ease-soft),
+        box-shadow var(--dur-fast) var(--ease-soft),
+        background var(--dur) var(--ease-soft),
+        color var(--dur) var(--ease-soft),
+        opacity var(--dur-fast) var(--ease-soft),
+        filter var(--dur-fast) var(--ease-soft);
+    }
+    .pressable:active {
+      transform: scale(0.97);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
     }
 
     .ico {
@@ -274,8 +334,15 @@
       font-size: 11px;
       font-weight: 600;
       color: var(--text-muted);
-      transition: color 0.2s, box-shadow 0.2s, background 0.2s;
+      transition: color var(--dur) var(--ease-soft),
+        box-shadow var(--dur) var(--ease-out),
+        background var(--dur) var(--ease-soft),
+        transform var(--dur-fast) var(--ease-soft);
       white-space: nowrap;
+    }
+
+    .view-tabs button:active {
+      transform: scale(0.96);
     }
 
     .view-tabs button.active {
@@ -438,14 +505,18 @@
       background: var(--glass-strong);
       box-shadow: var(--shadow-out-sm);
       border: 1px solid rgba(255,255,255,0.6);
-      transition: box-shadow 0.15s, color 0.15s, transform 0.15s;
+      transition: box-shadow var(--dur-fast) var(--ease-soft),
+        color var(--dur) var(--ease-soft),
+        transform var(--dur-fast) var(--ease-soft),
+        background var(--dur) var(--ease-soft),
+        filter var(--dur-fast) var(--ease-soft);
       backdrop-filter: blur(10px);
     }
 
     .icon-btn:hover { color: var(--accent); }
     .icon-btn:active {
       box-shadow: var(--shadow-in-sm);
-      transform: scale(0.96);
+      transform: scale(0.93);
     }
 
     .icon-btn.accent {
@@ -518,9 +589,15 @@
       box-shadow: var(--shadow-out-sm);
       border: 1px solid rgba(255,255,255,0.55);
       flex-shrink: 0;
+      transition: transform var(--dur-fast) var(--ease-soft),
+        box-shadow var(--dur-fast) var(--ease-soft),
+        background var(--dur) var(--ease-soft);
     }
 
-    .date-nav button:active { box-shadow: var(--shadow-in-sm); }
+    .date-nav button:active {
+      transform: scale(0.92);
+      box-shadow: var(--shadow-in-sm);
+    }
 
     .date-nav .current-label {
       font-weight: 800;
@@ -535,6 +612,8 @@
       text-overflow: ellipsis;
       flex: 0 1 auto;
       padding: 0 4px;
+      transition: opacity var(--dur-fast) var(--ease-soft),
+        transform var(--dur) var(--ease-out);
     }
 
     .date-nav .today-cal-btn {
@@ -547,6 +626,11 @@
       border: 1px solid rgba(255,255,255,0.55);
       color: #94a3b8;
       position: relative;
+      transition: color var(--dur) var(--ease-soft),
+        background var(--dur) var(--ease-soft),
+        border-color var(--dur) var(--ease-soft),
+        box-shadow var(--dur) var(--ease-out),
+        transform var(--dur-fast) var(--ease-soft);
     }
     .date-nav .today-cal-btn .cal-check { display: none; }
     .date-nav .today-cal-btn.is-today .cal-check { display: block; }
@@ -611,7 +695,10 @@
     }
 
     .view { display: none; flex: 1 1 auto; min-height: 0; overflow: hidden; flex-direction: column; }
-    .view.active { display: flex; }
+    .view.active {
+      display: flex;
+      animation: fade-in var(--dur) var(--ease-out) both;
+    }
     #viewWeek,
     #viewDay {
       min-height: 0;
@@ -631,13 +718,13 @@
 
     /* Свайп влево/вправо: Главная / Месяц / Неделя / День */
     .swipe-pane {
-      transition: transform 0.2s ease, opacity 0.2s ease;
+      transition: transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-out);
       will-change: transform, opacity;
     }
-    .swipe-pane.swipe-out-left { transform: translateX(-30px); opacity: 0; }
-    .swipe-pane.swipe-out-right { transform: translateX(30px); opacity: 0; }
-    .swipe-pane.swipe-in-left { transform: translateX(-30px); opacity: 0; }
-    .swipe-pane.swipe-in-right { transform: translateX(30px); opacity: 0; }
+    .swipe-pane.swipe-out-left { transform: translateX(-48px); opacity: 0; }
+    .swipe-pane.swipe-out-right { transform: translateX(48px); opacity: 0; }
+    .swipe-pane.swipe-in-left { transform: translateX(-48px); opacity: 0; }
+    .swipe-pane.swipe-in-right { transform: translateX(48px); opacity: 0; }
 
     .home-today-label {
       font-size: 13px;
@@ -645,6 +732,7 @@
       letter-spacing: 0.1em;
       color: var(--text-muted);
       margin-bottom: 8px;
+      animation: fade-in var(--dur-slow) var(--ease-out) both;
     }
 
     .home-date {
@@ -654,6 +742,8 @@
       line-height: 1.15;
       color: var(--text);
       margin-bottom: 6px;
+      animation: rise-in var(--dur-slow) var(--ease-out) both;
+      animation-delay: 0.04s;
     }
 
     .home-weekday {
@@ -661,6 +751,8 @@
       font-weight: 600;
       margin-bottom: 28px;
       letter-spacing: 0.04em;
+      animation: rise-in var(--dur-slow) var(--ease-out) both;
+      animation-delay: 0.08s;
     }
     .home-weekday.past { color: var(--text-muted); }
     .home-weekday.today { color: #16a34a; }
@@ -675,12 +767,16 @@
       line-height: 1.4;
       color: var(--text);
       margin-bottom: 14px;
+      animation: rise-in var(--dur-slow) var(--ease-out) both;
+      animation-delay: 0.1s;
     }
 
-    .home-types {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+    .home-view[data-settled="1"] .home-today-label,
+    .home-view[data-settled="1"] .home-date,
+    .home-view[data-settled="1"] .home-weekday,
+    .home-view[data-settled="1"] .home-section-title,
+    .home-view[data-settled="1"] .home-type-block {
+      animation: none !important;
     }
 
     .home-type-block {
@@ -690,7 +786,11 @@
       box-shadow: var(--shadow-out-sm);
       backdrop-filter: blur(10px);
       overflow: hidden;
+      animation: rise-in var(--dur-slow) var(--ease-out) both;
+      transition: box-shadow var(--dur) var(--ease-soft),
+        transform var(--dur-fast) var(--ease-soft);
     }
+    .home-types.anim-stagger .home-type-block { animation-name: rise-in; }
 
     .home-type-card {
       display: flex;
@@ -698,7 +798,7 @@
       gap: 14px;
       padding: 16px 18px;
       cursor: pointer;
-      transition: background 0.12s;
+      transition: background var(--dur) var(--ease-soft);
       user-select: none;
     }
 
@@ -712,6 +812,10 @@
       border-radius: 5px;
       flex-shrink: 0;
       box-shadow: 0 0 0 2px rgba(255,255,255,0.7);
+      transition: transform var(--dur) var(--ease-out);
+    }
+    .home-type-block.open .home-type-dot {
+      transform: scale(1.15);
     }
 
     .home-type-name {
@@ -729,6 +833,10 @@
       line-height: 1;
       min-width: 1.2em;
       text-align: right;
+      transition: transform var(--dur) var(--ease-out);
+    }
+    .home-type-block.open .home-type-count {
+      transform: scale(1.06);
     }
 
     .home-type-count.zero {
@@ -745,7 +853,7 @@
       stroke-width: 2.2;
       stroke-linecap: round;
       stroke-linejoin: round;
-      transition: transform 0.2s ease;
+      transition: transform var(--dur) var(--ease-out);
       transform: rotate(-90deg);
     }
     .home-type-block.open .home-type-chevron {
@@ -753,12 +861,22 @@
     }
 
     .home-type-events {
-      display: none;
-      padding: 0 10px 12px;
-      border-top: 1px solid rgba(120,140,180,0.12);
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows var(--dur) var(--ease-out);
+      border-top: 1px solid transparent;
     }
     .home-type-block.open .home-type-events {
-      display: block;
+      grid-template-rows: 1fr;
+      border-top-color: rgba(120,140,180,0.12);
+    }
+    .home-type-events-inner {
+      overflow: hidden;
+      min-height: 0;
+      padding: 0 10px;
+    }
+    .home-type-block.open .home-type-events-inner {
+      padding-bottom: 12px;
     }
 
     .home-type-event {
@@ -769,9 +887,24 @@
       border-radius: 12px;
       cursor: pointer;
       margin-top: 4px;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: background var(--dur-fast) var(--ease-soft),
+        opacity var(--dur) var(--ease-out),
+        transform var(--dur) var(--ease-out);
     }
+    .home-type-block.open .home-type-event {
+      opacity: 1;
+      transform: none;
+    }
+    .home-type-block.open .home-type-event:nth-child(1) { transition-delay: 0.04s; }
+    .home-type-block.open .home-type-event:nth-child(2) { transition-delay: 0.08s; }
+    .home-type-block.open .home-type-event:nth-child(3) { transition-delay: 0.12s; }
+    .home-type-block.open .home-type-event:nth-child(4) { transition-delay: 0.16s; }
+    .home-type-block.open .home-type-event:nth-child(n+5) { transition-delay: 0.2s; }
     .home-type-event:active {
       background: var(--accent-soft);
+      transform: scale(0.98);
     }
     .home-type-event.done .home-ev-title {
       text-decoration: line-through;
@@ -824,7 +957,22 @@
       box-shadow: var(--shadow-out-sm);
       border: 1px solid rgba(255,255,255,0.65);
       backdrop-filter: blur(10px);
+      animation: pop-in var(--dur-slow) var(--ease-out) both;
+      transition: transform var(--dur-fast) var(--ease-soft),
+        box-shadow var(--dur) var(--ease-soft);
     }
+    .year-grid .year-month:nth-child(1) { animation-delay: 0.02s; }
+    .year-grid .year-month:nth-child(2) { animation-delay: 0.05s; }
+    .year-grid .year-month:nth-child(3) { animation-delay: 0.08s; }
+    .year-grid .year-month:nth-child(4) { animation-delay: 0.11s; }
+    .year-grid .year-month:nth-child(5) { animation-delay: 0.14s; }
+    .year-grid .year-month:nth-child(6) { animation-delay: 0.17s; }
+    .year-grid .year-month:nth-child(7) { animation-delay: 0.2s; }
+    .year-grid .year-month:nth-child(8) { animation-delay: 0.23s; }
+    .year-grid .year-month:nth-child(9) { animation-delay: 0.26s; }
+    .year-grid .year-month:nth-child(10) { animation-delay: 0.29s; }
+    .year-grid .year-month:nth-child(11) { animation-delay: 0.32s; }
+    .year-grid .year-month:nth-child(12) { animation-delay: 0.35s; }
 
     .year-month-title {
       font-size: 11px;
@@ -905,6 +1053,12 @@
       min-width: 0;
       min-height: 0;
       box-sizing: border-box;
+      transition: transform var(--dur-fast) var(--ease-soft),
+        background var(--dur-fast) var(--ease-soft),
+        opacity var(--dur) var(--ease-soft);
+    }
+    .year-day:not(.other):active {
+      transform: scale(0.88);
     }
 
     .year-day.other { color: transparent; pointer-events: none; background: transparent !important; box-shadow: none !important; }
@@ -1124,14 +1278,18 @@
       display: flex;
       flex-direction: column;
       min-height: 0;
-      transition: box-shadow 0.1s, transform 0.1s;
+      transition: box-shadow var(--dur-fast) var(--ease-soft),
+        transform var(--dur-fast) var(--ease-soft),
+        background var(--dur) var(--ease-soft),
+        opacity var(--dur) var(--ease-soft);
       border-radius: 16px;
       box-shadow: var(--shadow-out-sm);
       border: 1px solid rgba(255,255,255,0.6);
       backdrop-filter: blur(8px);
+      animation: fade-in var(--dur-slow) var(--ease-out) both;
     }
 
-    .month-cell:active { box-shadow: var(--shadow-in-sm); transform: scale(0.98); }
+    .month-cell:active { box-shadow: var(--shadow-in-sm); transform: scale(0.96); }
     .month-cell.other-month { opacity: 0.35; }
     .month-cell.past {
       filter: brightness(0.94);
@@ -1739,20 +1897,40 @@
 
     /* ─── Модальные окна ─── */
     .modal {
-      display: none;
+      display: flex;
       position: fixed;
       inset: 0;
       z-index: 200;
       background: var(--body-bg);
       flex-direction: column;
       overflow: hidden;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(18px) scale(0.985);
+      transition: opacity var(--dur) var(--ease-out),
+        transform var(--dur) var(--ease-out),
+        visibility var(--dur) var(--ease-out);
     }
 
-    .modal.open { display: flex; }
+    .modal.open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: none;
+    }
 
     #modalRepeat {
       z-index: 260;
     }
+
+    .modal.open .modal-header,
+    .modal.open .modal-body,
+    .modal.open .modal-footer {
+      animation: rise-in var(--dur-slow) var(--ease-out) both;
+    }
+    .modal.open .modal-body { animation-delay: 0.05s; }
+    .modal.open .modal-footer { animation-delay: 0.1s; }
 
     .modal-header {
       height: var(--header-h);
@@ -1927,6 +2105,23 @@
       letter-spacing: 0.03em;
       box-shadow: none;
     }
+    .form-collapse-body {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows var(--dur) var(--ease-out);
+      padding: 0 12px;
+    }
+    .form-collapse.open .form-collapse-body {
+      grid-template-rows: 1fr;
+      padding-bottom: 12px;
+    }
+    .form-collapse-body > .form-group {
+      overflow: hidden;
+      min-height: 0;
+      margin-bottom: 0;
+    }
+    .form-collapse .form-group > label { display: none; }
+
     .form-collapse-btn .collapse-chevron {
       width: 16px;
       height: 16px;
@@ -1936,35 +2131,36 @@
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
-      transition: transform 0.2s ease;
+      transition: transform var(--dur) var(--ease-out);
       transform: rotate(-90deg);
     }
     .form-collapse.open .form-collapse-btn .collapse-chevron {
       transform: rotate(0deg);
     }
-    .form-collapse-body {
-      display: none;
-      padding: 0 12px 12px;
-    }
-    .form-collapse.open .form-collapse-body {
-      display: block;
-    }
-    .form-collapse .form-group {
-      margin-bottom: 0;
-    }
-    .form-collapse .form-group > label { display: none; }
 
     .edit-tasks-block {
-      display: none;
+      display: grid;
+      grid-template-rows: 0fr;
       margin: 0 0 14px;
+      padding: 0;
+      transition: grid-template-rows var(--dur) var(--ease-out),
+        margin var(--dur) var(--ease-out);
+    }
+    .edit-tasks-block.visible {
+      grid-template-rows: 1fr;
       padding: 8px 0 4px;
     }
-    .edit-tasks-block.visible { display: block; }
+    .edit-tasks-block > #editTasksList,
+    .edit-tasks-block > div {
+      overflow: hidden;
+      min-height: 0;
+    }
     .edit-task-row {
       display: flex;
       align-items: center;
       gap: 8px;
       margin-bottom: 8px;
+      animation: rise-in var(--dur) var(--ease-out) both;
     }
     .edit-task-num {
       flex-shrink: 0;
@@ -2082,18 +2278,25 @@
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
-      transition: transform 0.2s ease;
+      transition: transform var(--dur) var(--ease-out);
       transform: rotate(-90deg);
     }
     .detail-tasks.open .detail-tasks-btn .collapse-chevron {
       transform: rotate(0deg);
     }
     .detail-tasks-body {
-      display: none;
-      padding: 0 10px 10px;
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows var(--dur) var(--ease-out);
+      padding: 0 10px;
     }
     .detail-tasks.open .detail-tasks-body {
-      display: block;
+      grid-template-rows: 1fr;
+      padding-bottom: 10px;
+    }
+    .detail-tasks-inner {
+      overflow: hidden;
+      min-height: 0;
     }
     .detail-task-row {
       display: flex;
@@ -2102,9 +2305,23 @@
       padding: 8px 4px;
       cursor: pointer;
       border-radius: 10px;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: background var(--dur-fast) var(--ease-soft),
+        opacity var(--dur) var(--ease-out),
+        transform var(--dur) var(--ease-out);
     }
+    .detail-tasks.open .detail-task-row {
+      opacity: 1;
+      transform: none;
+    }
+    .detail-tasks.open .detail-task-row:nth-child(1) { transition-delay: 0.04s; }
+    .detail-tasks.open .detail-task-row:nth-child(2) { transition-delay: 0.08s; }
+    .detail-tasks.open .detail-task-row:nth-child(3) { transition-delay: 0.12s; }
+    .detail-tasks.open .detail-task-row:nth-child(n+4) { transition-delay: 0.16s; }
     .detail-task-row:active {
       background: var(--accent-soft);
+      transform: scale(0.98);
     }
     .detail-task-row input[type="checkbox"] {
       width: 20px;
@@ -2272,9 +2489,15 @@
       margin-bottom: 8px;
       cursor: pointer;
       box-shadow: var(--shadow-out-sm);
+      animation: rise-in var(--dur-slow) var(--ease-out) both;
+      transition: transform var(--dur-fast) var(--ease-soft),
+        box-shadow var(--dur-fast) var(--ease-soft);
     }
 
-    .search-result-item:active { box-shadow: var(--shadow-in-sm); }
+    .search-result-item:active {
+      box-shadow: var(--shadow-in-sm);
+      transform: scale(0.98);
+    }
     .search-result-item.done .sr-title { text-decoration: line-through; opacity: 0.6; }
 
     .sr-dot {
@@ -2293,7 +2516,7 @@
       position: fixed;
       bottom: 24px;
       left: 50%;
-      transform: translateX(-50%) translateY(80px);
+      transform: translateX(-50%) translateY(80px) scale(0.96);
       background: var(--text);
       color: #fff;
       padding: 12px 20px;
@@ -2301,14 +2524,14 @@
       font-size: 14px;
       z-index: 500;
       opacity: 0;
-      transition: transform 0.3s, opacity 0.3s;
+      transition: transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-out);
       max-width: 90%;
       text-align: center;
       box-shadow: 4px 8px 24px rgba(42, 46, 58, 0.25);
     }
 
     .toast.show {
-      transform: translateX(-50%) translateY(0);
+      transform: translateX(-50%) translateY(0) scale(1);
       opacity: 1;
     }
 
@@ -2316,7 +2539,7 @@
 
     /* ─── Диалог конфликта ─── */
     .dialog-overlay {
-      display: none;
+      display: flex;
       position: fixed;
       inset: 0;
       background: rgba(42, 46, 58, 0.35);
@@ -2324,9 +2547,17 @@
       align-items: center;
       justify-content: center;
       padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity var(--dur) var(--ease-out), visibility var(--dur) var(--ease-out);
     }
 
-    .dialog-overlay.open { display: flex; }
+    .dialog-overlay.open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
 
     .dialog {
       background: var(--bg);
@@ -2335,6 +2566,13 @@
       max-width: 360px;
       width: 100%;
       box-shadow: var(--shadow-out);
+      transform: translateY(16px) scale(0.96);
+      opacity: 0;
+      transition: transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-out);
+    }
+    .dialog-overlay.open .dialog {
+      transform: none;
+      opacity: 1;
     }
 
     .dialog h3 {
@@ -2547,7 +2785,7 @@
 
   <div class="app-splash" id="appSplash" aria-hidden="false">
     <img src="icon-512.png" alt="CalenBot" width="384" height="384">
-    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.22</div>
+    <div class="app-splash-ver" id="appSplashVer">CalenBot v1.1.23</div>
   </div>
 
   <!-- Верхняя панель + навигация по датам -->
@@ -2602,7 +2840,7 @@
 
     <!-- Вид «Год» -->
     <div class="view" id="viewYear">
-      <div class="year-grid" id="yearGrid"></div>
+      <div class="year-grid swipe-pane" id="yearGrid"></div>
     </div>
 
     <!-- Вид «Месяц» -->
@@ -2693,7 +2931,7 @@
           <span>Без времени (весь день)</span>
         </label>
       </div>
-      <div class="edit-tasks-block" id="editTasksBlock" hidden>
+      <div class="edit-tasks-block" id="editTasksBlock">
         <div id="editTasksList"></div>
       </div>
       <div class="form-collapse" id="collapseLocation">
@@ -2978,7 +3216,7 @@ const SCRIPT_URL = 'СЮДА_ВСТАВИТЬ_URL';
 const APP_VER_MAJOR = 1;
 const APP_VER_MINOR = 1;
 const APP_BUILD_DATE = '2026-07-31';
-const APP_BUILD_ITER = 22;
+const APP_BUILD_ITER = 23;
 
 function getAppVersionString() {
   return 'CalenBot v' + APP_VER_MAJOR + '.' + APP_VER_MINOR + '.' + APP_BUILD_ITER;
@@ -4642,7 +4880,7 @@ function renderHome() {
     (isToday ? 'today' : (past ? 'past' : 'future')) + '">' +
     WEEKDAYS_RU[day.getDay()] + '</div>';
   html += '<div class="home-section-title">' + sectionTitle + '</div>';
-  html += '<div class="home-types">';
+  html += '<div class="home-types anim-stagger">';
 
   if (!visibleTypes.length) {
     html += '<div class="home-empty">' + emptyText + '</div>';
@@ -4666,7 +4904,7 @@ function renderHome() {
       html += '<span class="home-type-count">' + n + '</span>';
       html += '<svg class="home-type-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
       html += '</div>';
-      html += '<div class="home-type-events">';
+      html += '<div class="home-type-events"><div class="home-type-events-inner">';
       typeEvs.forEach(ev => {
         const timeLabel = (isAllDay(ev) || !ev.start_time)
           ? 'день'
@@ -4676,11 +4914,16 @@ function renderHome() {
         html += '<span class="home-ev-title">' + esc(getTitle(ev)) + '</span>';
         html += '</div>';
       });
-      html += '</div></div>';
+      html += '</div></div></div>';
     });
   }
   html += '</div>';
+  const wasSettled = wrap.dataset.settled === '1';
   wrap.innerHTML = html;
+  if (wasSettled) wrap.dataset.settled = '1';
+  else {
+    requestAnimationFrame(() => { wrap.dataset.settled = '1'; });
+  }
 
   wrap.querySelectorAll('.home-type-card').forEach(card => {
     card.addEventListener('click', () => {
@@ -4749,7 +4992,7 @@ function animateViewSwipe(dir) {
 
   const outClass = dir > 0 ? 'swipe-out-left' : 'swipe-out-right';
   const inClass = dir > 0 ? 'swipe-in-right' : 'swipe-in-left';
-  const DUR = 180;
+  const DUR = 260;
 
   el.classList.add(outClass);
   setTimeout(() => {
@@ -5519,6 +5762,10 @@ function switchView(view) {
     clearInterval(_homeRemainTimer);
     _homeRemainTimer = null;
   }
+  if (view !== 'home') {
+    const hv = document.getElementById('homeView');
+    if (hv) delete hv.dataset.settled;
+  }
   state.view = view;
   document.querySelectorAll('.view-tabs button').forEach(b => {
     b.classList.toggle('active', b.dataset.view === view);
@@ -5650,7 +5897,6 @@ function syncEditTasksVisibility() {
   const on = document.getElementById('fHasTasks').checked;
   const block = document.getElementById('editTasksBlock');
   if (!block) return;
-  block.hidden = !on;
   block.classList.toggle('visible', on);
   if (on && !document.querySelector('#editTasksList .edit-task-row')) {
     renderEditTasksList([{ text: '' }]);
@@ -5832,14 +6078,14 @@ function openDetail(eventUid) {
     html += '<span class="detail-tasks-meta" id="detailTasksMeta">' + doneN + '/' + cl.length + '</span>';
     html += '<svg class="collapse-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
     html += '</button>';
-    html += '<div class="detail-tasks-body" id="detailTasksBody">';
+    html += '<div class="detail-tasks-body" id="detailTasksBody"><div class="detail-tasks-inner">';
     cl.forEach((t, i) => {
       html += '<label class="detail-task-row' + (t.done ? ' is-done' : '') + '">';
       html += '<input type="checkbox" data-task-idx="' + i + '"' + (t.done ? ' checked' : '') + '>';
       html += '<span class="detail-task-text">' + esc(t.text) + '</span>';
       html += '</label>';
     });
-    html += '</div></div>';
+    html += '</div></div></div>';
   }
   if (ev.repeat_type && ev.repeat_type !== 'none') {
     const rt = {
@@ -6711,7 +6957,7 @@ function init() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=42').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=43').catch(err => {
       console.warn('SW register failed:', err);
     });
   }
